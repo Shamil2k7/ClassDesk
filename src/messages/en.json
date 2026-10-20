@@ -1,0 +1,128 @@
+{
+  "app": {
+    "name": "ClassDesk",
+    "tagline": "Modern School & Tuition Management for India",
+    "installPwa": "Install App",
+    "offlineNotice": "You are offline. Showing cached data."
+  },
+  "nav": {
+    "dashboard": "Dashboard",
+    "classes": "Classes",
+    "attendance": "Attendance",
+    "fees": "Fees",
+    "notes": "Notes",
+    "announcements": "Announcements",
+    "timetable": "Timetable",
+    "exams": "Exams",
+    "settings": "Settings",
+    "students": "Students",
+    "teachers": "Teachers"
+  },
+  "auth": {
+    "welcome": "Welcome to ClassDesk",
+    "phoneLabel": "Mobile Number",
+    "phonePlaceholder": "Enter 10-digit mobile number",
+    "getOtp": "Send OTP",
+    "otpSent": "We sent a 6-digit OTP to",
+    "verifyOtp": "Verify & Login",
+    "resendOtp": "Resend OTP",
+    "demoTitle": "Quick Demo Login (Select Role):",
+    "superAdmin": "Super Admin",
+    "instituteAdmin": "School Principal / Admin",
+    "teacher": "Teacher (Maths)",
+    "parent": "Parent (2 Children Linked)"
+  },
+  "childSwitcher": {
+    "label": "Viewing Student",
+    "switchChild": "Switch Student",
+    "multipleLinked": "Children linked to this phone"
+  },
+  "dashboard": {
+    "welcomeBack": "Welcome back",
+    "todaySchedule": "Today's Schedule",
+    "quickActions": "Quick Actions",
+    "stats": {
+      "totalStudents": "Total Students",
+      "attendanceRate": "Today's Attendance",
+      "pendingFees": "Pending Fees",
+      "activeTeachers": "Active Teachers"
+    },
+    "parentBanner": {
+      "todayAttendance": "Today's Attendance",
+      "dueFees": "Fee Due",
+      "payNow": "Pay Now"
+    }
+  },
+  "attendance": {
+    "title": "Daily Attendance",
+    "selectClass": "Select Class",
+    "selectDate": "Select Date",
+    "markAllPresent": "Mark All Present",
+    "present": "Present",
+    "absent": "Absent",
+    "late": "Late",
+    "halfDay": "Half Day",
+    "saveAndNotify": "Save & Send Parent Alerts",
+    "savedSuccess": "Attendance saved successfully!",
+    "absentAlertSent": "SMS/Push absent alert triggered for parents",
+    "summary": "Attendance Summary",
+    "monthlyPercentage": "Monthly Attendance"
+  },
+  "fees": {
+    "title": "Fee Management",
+    "plans": "Fee Plans",
+    "pendingDues": "Pending Dues",
+    "paymentHistory": "Payment History",
+    "recordCashPayment": "Record Cash / UPI",
+    "payOnline": "Pay Online with Razorpay",
+    "receiptNumber": "Receipt No.",
+    "amount": "Amount",
+    "dueDate": "Due Date",
+    "status": "Status",
+    "downloadReceipt": "Download Receipt (PDF)",
+    "lateFine": "Late Fine",
+    "receiptHeader": "Official Fee Receipt"
+  },
+  "notes": {
+    "title": "Study Notes & Materials",
+    "uploadNote": "Upload Note",
+    "filterSubject": "Filter by Subject",
+    "download": "View / Download",
+    "fileSize": "File Size",
+    "uploadedBy": "Uploaded by"
+  },
+  "announcements": {
+    "title": "Announcements",
+    "newAnnouncement": "Create Announcement",
+    "targetAll": "Entire School",
+    "targetClass": "Specific Class",
+    "post": "Publish Announcement"
+  },
+  "exams": {
+    "title": "Exams & Marks",
+    "createExam": "Schedule Exam",
+    "enterMarks": "Enter Marks",
+    "publishResults": "Publish Results",
+    "reportCard": "Report Card",
+    "downloadPdf": "Download Report Card (PDF)",
+    "maxMarks": "Max Marks",
+    "passMarks": "Pass Marks",
+    "obtained": "Obtained",
+    "percentage": "Percentage",
+    "grade": "Grade",
+    "rank": "Rank"
+  },
+  "settings": {
+    "title": "Settings",
+    "notifications": "Push Notifications",
+    "absentAlert": "Instant Absent Alert",
+    "feeDue": "Fee Due Reminders",
+    "feePaid": "Fee Payment Confirmation",
+    "announcement": "Important Announcements",
+    "newNotes": "New Study Material Uploaded",
+    "timetableChange": "Timetable Changes",
+    "marksPublished": "Exam Marks Published",
+    "language": "App Language",
+    "logout": "Log Out"
+  }
+}

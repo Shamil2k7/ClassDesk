@@ -1,0 +1,128 @@
+{
+  "app": {
+    "name": "ക്ലാസ്സ്ഡെസ്ക്",
+    "tagline": "സ്കൂളുകൾക്കും ട്യൂഷൻ സെന്ററുകൾക്കുമുള്ള ആപ്പ്",
+    "installPwa": "ആപ്പ് ഇൻസ്റ്റാൾ ചെയ്യുക",
+    "offlineNotice": "നിങ്ങൾ ഓഫ്ലൈനാണ്. കാഷെ ചെയ്ത വിവരങ്ങൾ കാണിക്കുന്നു."
+  },
+  "nav": {
+    "dashboard": "ഡാഷ്‌ബോർഡ്",
+    "classes": "ക്ലാസുകൾ",
+    "attendance": "ഹാജർ",
+    "fees": "ഫീസ്",
+    "notes": "നോട്ടുകൾ",
+    "announcements": "അറിയിപ്പുകൾ",
+    "timetable": "ടൈംടേബിൾ",
+    "exams": "പരീക്ഷകൾ",
+    "settings": "സെറ്റിംഗ്സ്",
+    "students": "വിദ്യാർത്ഥികൾ",
+    "teachers": "അധ്യാപകർ"
+  },
+  "auth": {
+    "welcome": "ക്ലാസ്സ്ഡെസ്കിലേക്ക് സ്വാഗതം",
+    "phoneLabel": "മൊബൈൽ നമ്പർ",
+    "phonePlaceholder": "10 അക്ക മൊബൈൽ നമ്പർ നൽകുക",
+    "getOtp": "OTP അയക്കുക",
+    "otpSent": "6 അക്ക OTP അയച്ചിട്ടുണ്ട്",
+    "verifyOtp": "പരിശോധിച്ച് ലോഗിൻ ചെയ്യുക",
+    "resendOtp": "വീണ്ടും അയക്കുക",
+    "demoTitle": "ഡെമോ ലോഗിൻ (റോളുകൾ തിരഞ്ഞെടുക്കുക):",
+    "superAdmin": "സൂപ്പർ അഡ്മിൻ",
+    "instituteAdmin": "സ്കൂൾ പ്രിൻസിപ്പൽ / അഡ്മിൻ",
+    "teacher": "അധ്യാപകൻ (മാത്സ്)",
+    "parent": "രക്ഷിതാവ് (2 കുട്ടികൾ ലിങ്ക് ചെയ്തത്)"
+  },
+  "childSwitcher": {
+    "label": "നിലവിലെ വിദ്യാർത്ഥി",
+    "switchChild": "കുട്ടിയെ മാറ്റുക",
+    "multipleLinked": "ഈ നമ്പറുമായി ലിങ്ക് ചെയ്ത കുട്ടികൾ"
+  },
+  "dashboard": {
+    "welcomeBack": "സ്വാഗതം",
+    "todaySchedule": "ഇന്നത്തെ ക്ലാസുകൾ",
+    "quickActions": "പ്രധാന പ്രവർത്തനങ്ങൾ",
+    "stats": {
+      "totalStudents": "ആകെ കുട്ടികൾ",
+      "attendanceRate": "ഇന്നത്തെ ഹാജർ",
+      "pendingFees": "കുടിശ്ശിക ഫീസ്",
+      "activeTeachers": "അധ്യാപകർ"
+    },
+    "parentBanner": {
+      "todayAttendance": "ഇന്നത്തെ ഹാജർ",
+      "dueFees": "അടയ്ക്കാനുള്ള ഫീസ്",
+      "payNow": "ഇപ്പോൾ അടയ്ക്കുക"
+    }
+  },
+  "attendance": {
+    "title": "ദിവസേനയുള്ള ഹാജർ",
+    "selectClass": "ക്ലാസ് തിരഞ്ഞെടുക്കുക",
+    "selectDate": "തീയതി തിരഞ്ഞെടുക്കുക",
+    "markAllPresent": "എല്ലാവർക്കും ഹാജർ നൽകുക",
+    "present": "ഹാജർ",
+    "absent": "ഹാജരില്ല",
+    "late": "വൈകി",
+    "halfDay": "ഹാഫ് ഡേ",
+    "saveAndNotify": "സേവ് ചെയ്ത് രക്ഷിതാക്കൾക്ക് അറിയിപ്പ് അയക്കുക",
+    "savedSuccess": "ഹാജർ വിജയകരമായി രേഖപ്പെടുത്തി!",
+    "absentAlertSent": "ഹാജരില്ലാത്ത കുട്ടികളുടെ രക്ഷിതാക്കൾക്ക് മെസ്സേജ് അയച്ചു",
+    "summary": "ഹാജർ സംഗ്രഹം",
+    "monthlyPercentage": "പ്രതിമാസ ഹാജർ ശതമാനം"
+  },
+  "fees": {
+    "title": "ഫീസ് മാനേജ്‌മെന്റ്",
+    "plans": "ഫീസ് പ്ലാനുകൾ",
+    "pendingDues": "അടയ്ക്കാനുള്ള ഫീസ്",
+    "paymentHistory": "ഫീസ് ചരിത്രം",
+    "recordCashPayment": "പണമായി / UPI വഴി അടച്ചത് രേഖപ്പെടുത്തുക",
+    "payOnline": "Razorpay വഴി ഓൺലൈനായി അടയ്ക്കുക",
+    "receiptNumber": "രസീത് നമ്പർ",
+    "amount": "തുക",
+    "dueDate": "അവസാന തീയതി",
+    "status": "സ്റ്റാറ്റസ്",
+    "downloadReceipt": "രസീത് ഡൗൺലോഡ് ചെയ്യുക (PDF)",
+    "lateFine": "പിഴ",
+    "receiptHeader": "ഔദ്യോഗിക ഫീസ് രസീത്"
+  },
+  "notes": {
+    "title": "പഠന സാമഗ്രികൾ & നോട്ടുകൾ",
+    "uploadNote": "നോട്ട് അപ്‌ലോഡ് ചെയ്യുക",
+    "filterSubject": "വിഷയം തിരിക്കുക",
+    "download": "കാണുക / ഡൗൺലോഡ്",
+    "fileSize": "ഫയൽ വലുപ്പം",
+    "uploadedBy": "അപ്‌ലോഡ് ചെയ്തത്"
+  },
+  "announcements": {
+    "title": "അറിയിപ്പുകൾ",
+    "newAnnouncement": "പുതിയ അറിയിപ്പ്",
+    "targetAll": "സ്കൂൾ മുഴുവൻ",
+    "targetClass": "പ്രത്യേക ക്ലാസ്",
+    "post": "പ്രസിദ്ധീകരിക്കുക"
+  },
+  "exams": {
+    "title": "പരീക്ഷകളും മാർക്കുകളും",
+    "createExam": "പരീക്ഷ ക്രമീകരിക്കുക",
+    "enterMarks": "മാർക്ക് രേഖപ്പെടുത്തുക",
+    "publishResults": "റിസൾട്ട് പ്രസിദ്ധീകരിക്കുക",
+    "reportCard": "റിപ്പോർട്ട് കാർഡ്",
+    "downloadPdf": "റിപ്പോർട്ട് കാർഡ് PDF ഡൗൺലോഡ്",
+    "maxMarks": "ആകെ മാർക്ക്",
+    "passMarks": "പാസ്സ് മാർക്ക്",
+    "obtained": "ലഭിച്ചത്",
+    "percentage": "ശതമാനം",
+    "grade": "ഗ്രേഡ്",
+    "rank": "റാങ്ക്"
+  },
+  "settings": {
+    "title": "സെറ്റിംഗ്സ്",
+    "notifications": "പുഷ് അറിയിപ്പുകൾ",
+    "absentAlert": "കുട്ടി ഹാജരില്ലെങ്കിൽ അറിയിപ്പ്",
+    "feeDue": "ഫീസ് അടയ്ക്കാനുള്ള ഓർമ്മപ്പെടുത്തൽ",
+    "feePaid": "ഫീസ് അടച്ച രസീത്",
+    "announcement": "പ്രധാന അറിയിപ്പുകൾ",
+    "newNotes": "പുതിയ നോട്ടുകൾ അപ്‌ലോഡ് ചെയ്യുമ്പോൾ",
+    "timetableChange": "ടൈംടേബിൾ മാറ്റങ്ങൾ",
+    "marksPublished": "പരീക്ഷാ മാർക്കുകൾ പ്രസിദ്ധീകരിക്കുമ്പോൾ",
+    "language": "ഭാഷ",
+    "logout": "ലോഗ് ഔട്ട്"
+  }
+}

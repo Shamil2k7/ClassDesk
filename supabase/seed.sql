@@ -1,0 +1,5 @@
+-- ==============================================================================
+-- CLASSDESK SEED DATA (Clean Template)
+-- Seed data removed as per production environment configuration.
+-- Add custom initial institute or admin records here if desired.
+-- ==============================================================================
