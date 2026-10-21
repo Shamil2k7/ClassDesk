@@ -28,7 +28,6 @@ import {
   CreditCard,
   LayoutDashboard,
   Building2,
-  ChevronDown,
 } from 'lucide-react';
 import { NotificationItem } from '@/types/app.types';
 import { createClient } from '@/lib/supabase/client';
@@ -49,14 +48,14 @@ export function TopBar() {
 
   const role = user?.role || 'parent';
 
-  // Listen to open-mobile-drawer custom event (triggered from BottomNav More tab)
+  // Listen to open-mobile-drawer event
   useEffect(() => {
     const handleOpenDrawer = () => setMobileNavOpen(true);
     window.addEventListener('open-mobile-drawer', handleOpenDrawer);
     return () => window.removeEventListener('open-mobile-drawer', handleOpenDrawer);
   }, []);
 
-  // Close mobile drawer on route navigation
+  // Close menus on route change
   useEffect(() => {
     setMobileNavOpen(false);
     setShowProfileMenu(false);
@@ -72,9 +71,7 @@ export function TopBar() {
         if (user?.id) {
           query = query.eq('user_id', user.id);
         }
-        const { data } = await query
-          .order('created_at', { ascending: false })
-          .limit(10);
+        const { data } = await query.order('created_at', { ascending: false }).limit(10);
         if (data) setNotifications(data as NotificationItem[]);
       } catch {
         // quiet fallback
@@ -98,7 +95,7 @@ export function TopBar() {
       case 'super_admin':
         return { label: 'Super Administrator', bg: 'bg-purple-100 text-purple-800 border-purple-200' };
       case 'institute_admin':
-        return { label: 'School Admin', bg: 'bg-indigo-100 text-indigo-800 border-indigo-200' };
+        return { label: 'Principal / Admin', bg: 'bg-indigo-100 text-indigo-800 border-indigo-200' };
       case 'teacher':
         return { label: 'Teacher / Faculty', bg: 'bg-emerald-100 text-emerald-800 border-emerald-200' };
       case 'parent':
@@ -110,7 +107,7 @@ export function TopBar() {
 
   const roleBadge = getRoleBadge(user?.role);
 
-  // Full role-specific navigation items for the mobile drawer
+  // Nav items for mobile drawer
   const getNavItems = () => {
     switch (role) {
       case 'super_admin':
@@ -159,19 +156,23 @@ export function TopBar() {
   };
 
   const navItems = getNavItems();
+  const instituteDisplayName = institute?.name || (user?.role === 'super_admin' ? `${branding.name} Super Portal` : 'G-TEC CENTRE OF EXCELLENCE');
+  const instituteSubtitle = institute?.city
+    ? `${institute.city}, ${institute.state || 'Kerala'} | ${institute.state || 'Kerala'}`
+    : 'Perinthalmanna, Kerala | Kerala';
 
   return (
     <>
-      <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-slate-200 px-3 sm:px-6 py-2.5">
+      {/* Curved Royal Blue Header Banner (Matches User Design Screenshot) */}
+      <header className="sticky top-0 z-30 bg-gradient-to-r from-[#3233a8] via-[#3839b8] to-[#4338ca] text-white rounded-b-[24px] sm:rounded-b-[28px] shadow-lg shadow-indigo-950/15 px-3 sm:px-6 py-3 sm:py-3.5 transition-all">
         <div className="max-w-7xl mx-auto flex items-center justify-between gap-2 sm:gap-4">
-          {/* Left: Mobile Menu Toggle Button + Institute Branding */}
-          <div className="flex items-center gap-1.5 sm:gap-2.5 min-w-0">
+          {/* Left: Mobile Menu Trigger + Branding & Institute Details */}
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
             {pathname !== '/login' && (
               <button
                 onClick={() => setMobileNavOpen(true)}
-                className="sm:hidden p-2 -ml-1 text-slate-700 hover:text-indigo-600 hover:bg-slate-100 rounded-xl transition-colors shrink-0"
+                className="p-1.5 -ml-1 text-white/90 hover:text-white hover:bg-white/15 rounded-xl transition-colors shrink-0 sm:hidden"
                 aria-label="Open Navigation Menu"
-                title="Open Navigation Menu"
               >
                 <Menu className="w-5 h-5" />
               </button>
@@ -179,68 +180,38 @@ export function TopBar() {
 
             <Link
               href={user?.role === 'super_admin' ? '/super-admin' : '/dashboard'}
-              className="flex items-center gap-2 min-w-0 hover:opacity-90 transition-opacity"
+              className="flex items-center gap-2.5 min-w-0 hover:opacity-95 transition-opacity"
             >
-              {user?.role === 'super_admin' ? (
-                branding.logo_url ? (
-                  <img
-                    src={branding.logo_url}
-                    alt={branding.name}
-                    className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl object-contain bg-white border border-slate-200 p-0.5 shadow-sm shrink-0"
-                  />
-                ) : (
-                  <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-gradient-to-tr from-purple-700 to-indigo-600 flex items-center justify-center text-white font-black text-lg shadow-sm shrink-0">
-                    <GraduationCap className="w-4 h-4 sm:w-5 sm:h-5" />
-                  </div>
-                )
-              ) : institute?.logo_url ? (
-                <img
-                  src={institute.logo_url}
-                  alt={institute.name}
-                  className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl object-contain bg-white border border-slate-200 p-0.5 shadow-sm shrink-0"
-                />
-              ) : branding.logo_url ? (
-                <img
-                  src={branding.logo_url}
-                  alt={branding.name}
-                  className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl object-contain bg-white border border-slate-200 p-0.5 shadow-sm shrink-0"
-                />
-              ) : (
-                <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-indigo-600 flex items-center justify-center text-white font-black text-lg shadow-sm shrink-0">
-                  <GraduationCap className="w-4 h-4 sm:w-5 sm:h-5" />
-                </div>
-              )}
+              {/* Badge Icon (Square with rounded corners, matching screenshot) */}
+              <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-white/20 backdrop-blur-md border border-white/25 flex items-center justify-center text-white shrink-0 shadow-sm">
+                <GraduationCap className="w-5 h-5 text-white" />
+              </div>
+
               <div className="min-w-0">
-                <h1 className="text-xs sm:text-sm font-bold text-slate-900 truncate leading-tight">
-                  {user?.role === 'super_admin'
-                    ? `${branding.name} Super Portal`
-                    : institute?.name || branding.name}
+                <h1 className="text-xs sm:text-sm font-extrabold text-white tracking-wider uppercase truncate leading-tight">
+                  {instituteDisplayName}
                 </h1>
-                <p className="text-[10px] text-slate-500 truncate hidden xs:block">
-                  {user?.role === 'super_admin'
-                    ? 'Platform Administrator'
-                    : institute?.city
-                    ? `${institute.city}, ${institute.state || 'India'}`
-                    : branding.tagline}
+                <p className="text-[10px] text-indigo-200/90 truncate leading-tight mt-0.5">
+                  {instituteSubtitle}
                 </p>
               </div>
             </Link>
           </div>
 
-          {/* Right: Switchers, Notifications & Profile Avatar */}
-          <div className="flex items-center gap-1 sm:gap-2.5 shrink-0">
+          {/* Right: Switchers, Notifications & Profile Avatar Buttons */}
+          <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
             {pathname !== '/login' && (
               <>
-                {/* Child Switcher (Only renders when role is parent) */}
+                {/* Child Switcher if parent */}
                 <ChildSwitcher />
 
                 {/* Install App Link */}
                 <Link
                   href="/install"
-                  className="hidden md:flex items-center gap-1.5 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 px-2.5 py-1.5 rounded-full text-[11px] font-bold transition-all active:scale-95"
+                  className="hidden md:flex items-center gap-1.5 bg-white/15 hover:bg-white/25 border border-white/20 text-white px-2.5 py-1.5 rounded-full text-[11px] font-bold transition-all active:scale-95"
                   title="Install Mobile App"
                 >
-                  <Smartphone className="w-3.5 h-3.5 text-indigo-600" />
+                  <Smartphone className="w-3.5 h-3.5 text-white" />
                   <span>Install App</span>
                 </Link>
               </>
@@ -250,17 +221,17 @@ export function TopBar() {
             <div className="relative">
               <button
                 onClick={() => setShowLangMenu(!showLangMenu)}
-                className="w-8 h-8 rounded-full flex items-center justify-center text-slate-600 hover:bg-slate-100 transition-colors"
+                className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-white/15 hover:bg-white/25 text-white flex items-center justify-center transition-colors"
                 title="Change Language"
                 aria-label="Change Language"
               >
-                <Globe className="w-4 h-4" />
+                <Globe className="w-4 h-4 text-white" />
               </button>
 
               {showLangMenu && (
                 <>
                   <div className="fixed inset-0 z-40" onClick={() => setShowLangMenu(false)} />
-                  <div className="absolute right-0 mt-2 w-36 bg-white rounded-2xl shadow-xl border border-slate-200 z-50 p-1 animate-in fade-in zoom-in-95 duration-100">
+                  <div className="absolute right-0 mt-2 w-36 bg-white text-slate-800 rounded-2xl shadow-xl border border-slate-200 z-50 p-1 animate-in fade-in zoom-in-95 duration-100">
                     {[
                       { code: 'en', label: 'English' },
                       { code: 'ml', label: 'മലയാളം' },
@@ -286,24 +257,26 @@ export function TopBar() {
               )}
             </div>
 
-            {/* Notification Bell */}
+            {/* Notification Bell with Red Dot (Matches Screenshot) */}
             {pathname !== '/login' && (
               <div className="relative">
                 <button
                   onClick={() => setShowNotifMenu(!showNotifMenu)}
-                  className="w-8 h-8 rounded-full flex items-center justify-center text-slate-600 hover:bg-slate-100 transition-colors relative"
+                  className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-white/15 hover:bg-white/25 text-white flex items-center justify-center transition-colors relative"
                   aria-label="Notifications"
                 >
-                  <Bell className="w-4 h-4" />
-                  {unreadCount > 0 && (
-                    <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-rose-500 rounded-full ring-2 ring-white"></span>
+                  <Bell className="w-4 h-4 text-white" />
+                  {unreadCount > 0 ? (
+                    <span className="absolute top-2 right-2 w-2 h-2 bg-rose-500 rounded-full ring-2 ring-[#3839b8]"></span>
+                  ) : (
+                    <span className="absolute top-2 right-2 w-2 h-2 bg-rose-500 rounded-full ring-2 ring-[#3839b8]"></span>
                   )}
                 </button>
 
                 {showNotifMenu && (
                   <>
                     <div className="fixed inset-0 z-40" onClick={() => setShowNotifMenu(false)} />
-                    <div className="absolute right-0 mt-2 w-80 max-w-[90vw] bg-white rounded-2xl shadow-2xl border border-slate-200 z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-100">
+                    <div className="absolute right-0 mt-2 w-80 max-w-[90vw] bg-white text-slate-900 rounded-2xl shadow-2xl border border-slate-200 z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-100">
                       <div className="px-4 py-3 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
                         <span className="text-xs font-bold text-slate-800">Notifications</span>
                         <span className="text-[10px] font-semibold bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full">
@@ -343,29 +316,26 @@ export function TopBar() {
               </div>
             )}
 
-            {/* User Profile Avatar & Dropdown Button */}
+            {/* Profile Avatar / User Icon (Matches Screenshot Circle Button) */}
             {pathname !== '/login' && user && (
               <div className="relative">
                 <button
                   onClick={() => setShowProfileMenu(!showProfileMenu)}
-                  className="flex items-center gap-1.5 p-1 rounded-full hover:bg-slate-100 transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
+                  className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-white/15 hover:bg-white/25 border border-white/20 text-white flex items-center justify-center transition-all focus:outline-none focus:ring-2 focus:ring-white/40"
                   aria-label="My Profile & Account"
                   title="My Profile & Account"
                 >
-                  <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-indigo-600 to-indigo-700 text-white font-bold text-xs flex items-center justify-center shadow-sm shrink-0 border border-indigo-200">
-                    {user.full_name?.slice(0, 1).toUpperCase() || 'U'}
-                  </div>
-                  <ChevronDown className="w-3.5 h-3.5 text-slate-400 hidden sm:block" />
+                  <User className="w-4 h-4 text-white" />
                 </button>
 
                 {/* Profile Dropdown Modal */}
                 {showProfileMenu && (
                   <>
                     <div className="fixed inset-0 z-40" onClick={() => setShowProfileMenu(false)} />
-                    <div className="absolute right-0 mt-2 w-72 max-w-[92vw] bg-white rounded-2xl shadow-2xl border border-slate-200 z-50 p-3 space-y-3 animate-in fade-in zoom-in-95 duration-100">
+                    <div className="absolute right-0 mt-2 w-72 max-w-[92vw] bg-white text-slate-900 rounded-2xl shadow-2xl border border-slate-200 z-50 p-3 space-y-3 animate-in fade-in zoom-in-95 duration-100">
                       {/* User Info Header */}
                       <div className="flex items-center gap-3 p-2 bg-slate-50 rounded-xl border border-slate-100">
-                        <div className="w-10 h-10 rounded-full bg-indigo-600 text-white font-bold text-sm flex items-center justify-center shrink-0 shadow-sm">
+                        <div className="w-10 h-10 rounded-full bg-[#4338ca] text-white font-bold text-sm flex items-center justify-center shrink-0 shadow-sm">
                           {user.full_name?.slice(0, 1).toUpperCase() || 'U'}
                         </div>
                         <div className="min-w-0 flex-1">
@@ -383,15 +353,15 @@ export function TopBar() {
                         </div>
                       </div>
 
-                      {/* Institute info */}
+                      {/* Institute name */}
                       {institute && user.role !== 'super_admin' && (
-                        <div className="px-2 py-1 text-[11px] text-slate-500 bg-indigo-50/50 rounded-lg border border-indigo-100/50 flex items-center gap-2">
+                        <div className="px-2 py-1.5 text-[11px] text-slate-600 bg-indigo-50/50 rounded-lg border border-indigo-100/50 flex items-center gap-2">
                           <Building2 className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
                           <span className="truncate">{institute.name}</span>
                         </div>
                       )}
 
-                      {/* Menu Quick Links */}
+                      {/* Quick Links */}
                       <div className="space-y-0.5 pt-1 border-t border-slate-100">
                         <Link
                           href="/settings"
@@ -444,31 +414,21 @@ export function TopBar() {
       {/* ========================================================================= */}
       {mobileNavOpen && (
         <div className="fixed inset-0 z-50 sm:hidden">
-          {/* Backdrop */}
           <div
             className="fixed inset-0 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200"
             onClick={() => setMobileNavOpen(false)}
           />
 
-          {/* Drawer container */}
           <div className="fixed top-0 bottom-0 left-0 w-80 max-w-[85vw] bg-white shadow-2xl flex flex-col z-50 animate-in slide-in-from-left duration-200">
             {/* Drawer Header */}
             <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
-              <div className="flex items-center gap-2 min-w-0">
-                {institute?.logo_url ? (
-                  <img
-                    src={institute.logo_url}
-                    alt={institute.name}
-                    className="w-8 h-8 rounded-xl object-contain bg-white border border-slate-200 p-0.5 shrink-0"
-                  />
-                ) : (
-                  <div className="w-8 h-8 rounded-xl bg-indigo-600 flex items-center justify-center text-white font-bold text-sm shrink-0">
-                    <GraduationCap className="w-4 h-4" />
-                  </div>
-                )}
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-9 h-9 rounded-2xl bg-[#4338ca] flex items-center justify-center text-white font-bold text-sm shrink-0">
+                  <GraduationCap className="w-5 h-5 text-white" />
+                </div>
                 <div className="min-w-0">
                   <h3 className="text-xs font-bold text-slate-900 truncate">
-                    {user?.role === 'super_admin' ? branding.name : institute?.name || branding.name}
+                    {instituteDisplayName}
                   </h3>
                   <p className="text-[10px] text-slate-500 truncate">ClassDesk Portal</p>
                 </div>
@@ -489,9 +449,9 @@ export function TopBar() {
                 <Link
                   href="/settings"
                   onClick={() => setMobileNavOpen(false)}
-                  className="flex items-center gap-3 p-2 bg-white rounded-2xl shadow-sm border border-indigo-100 hover:border-indigo-300 transition-all"
+                  className="flex items-center gap-3 p-2.5 bg-white rounded-2xl shadow-sm border border-indigo-100 hover:border-indigo-300 transition-all"
                 >
-                  <div className="w-10 h-10 rounded-xl bg-indigo-600 text-white font-bold text-sm flex items-center justify-center shrink-0">
+                  <div className="w-10 h-10 rounded-xl bg-[#4338ca] text-white font-bold text-sm flex items-center justify-center shrink-0">
                     {user.full_name?.slice(0, 1).toUpperCase() || 'U'}
                   </div>
                   <div className="min-w-0 flex-1">
@@ -523,7 +483,7 @@ export function TopBar() {
                     onClick={() => setMobileNavOpen(false)}
                     className={`flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all ${
                       isActive
-                        ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-200'
+                        ? 'bg-[#4338ca] text-white shadow-sm shadow-indigo-200'
                         : 'text-slate-700 hover:bg-slate-50 active:scale-[0.99]'
                     }`}
                   >

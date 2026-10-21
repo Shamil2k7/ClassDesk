@@ -50,11 +50,11 @@ export function BottomNav() {
         ];
       case 'institute_admin':
         return [
-          { href: '/dashboard', label: t('nav.dashboard', 'Home'), icon: LayoutDashboard },
+          { href: '/dashboard', label: t('nav.dashboard', 'Dashboard'), icon: LayoutDashboard },
           { href: '/attendance', label: t('nav.attendance', 'Attendance'), icon: CalendarCheck },
           { href: '/fees', label: t('nav.fees', 'Fees'), icon: CreditCard },
           { href: '/classes', label: t('nav.classes', 'Classes'), icon: Users },
-          { label: 'More', icon: Menu, isMenuTrigger: true },
+          { href: '/exams', label: t('nav.exams', 'Exams'), icon: Award },
         ];
       case 'teacher':
         return [
@@ -98,14 +98,14 @@ export function BottomNav() {
                 key="menu-trigger"
                 onClick={handleOpenDrawer}
                 className={`flex flex-col items-center justify-center flex-1 py-1 min-h-[48px] touch-manipulation transition-all active:scale-95 ${
-                  isMoreActive ? 'text-indigo-600 font-bold' : 'text-slate-500 hover:text-slate-800'
+                  isMoreActive ? 'text-[#4338ca] font-bold' : 'text-slate-500 hover:text-slate-800 font-medium'
                 }`}
                 aria-label="Open Full Navigation Menu"
               >
                 <Icon className={`w-5 h-5 mb-0.5 ${isMoreActive ? 'stroke-[2.5px]' : 'stroke-2'}`} />
                 <span className="text-[10px] leading-tight tracking-tight">{item.label}</span>
                 {isMoreActive && (
-                  <span className="w-1 h-1 rounded-full bg-indigo-600 mt-0.5 animate-pulse" />
+                  <span className="w-5 h-[3px] rounded-full bg-[#4338ca] mt-0.5" />
                 )}
               </button>
             );
@@ -117,13 +117,13 @@ export function BottomNav() {
               key={item.href || idx}
               href={item.href || '#'}
               className={`flex flex-col items-center justify-center flex-1 py-1 min-h-[48px] touch-manipulation transition-all active:scale-95 ${
-                isActive ? 'text-indigo-600 font-bold' : 'text-slate-500 hover:text-slate-800'
+                isActive ? 'text-[#4338ca] font-bold' : 'text-slate-500 hover:text-slate-800 font-medium'
               }`}
             >
               <Icon className={`w-5 h-5 mb-0.5 ${isActive ? 'stroke-[2.5px]' : 'stroke-2'}`} />
               <span className="text-[10px] leading-tight tracking-tight">{item.label}</span>
               {isActive && (
-                <span className="w-1 h-1 rounded-full bg-indigo-600 mt-0.5 animate-pulse" />
+                <span className="w-5 h-[3px] rounded-full bg-[#4338ca] mt-0.5" />
               )}
             </Link>
           );
