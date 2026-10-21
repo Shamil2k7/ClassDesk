@@ -18,6 +18,7 @@ import {
   Users,
   ShieldAlert,
   Menu,
+  Video,
 } from 'lucide-react';
 
 interface BottomNavItem {
@@ -51,26 +52,26 @@ export function BottomNav() {
       case 'institute_admin':
         return [
           { href: '/dashboard', label: t('nav.dashboard', 'Dashboard'), icon: LayoutDashboard },
+          { href: '/online-classes', label: 'Zoom Class', icon: Video },
           { href: '/attendance', label: t('nav.attendance', 'Attendance'), icon: CalendarCheck },
           { href: '/fees', label: t('nav.fees', 'Fees'), icon: CreditCard },
-          { href: '/classes', label: t('nav.classes', 'Classes'), icon: Users },
-          { href: '/exams', label: t('nav.exams', 'Exams'), icon: Award },
+          { label: 'More', icon: Menu, isMenuTrigger: true },
         ];
       case 'teacher':
         return [
           { href: '/dashboard', label: t('nav.dashboard', 'Today'), icon: LayoutDashboard },
+          { href: '/online-classes', label: 'Zoom Class', icon: Video },
           { href: '/attendance', label: t('nav.attendance', 'Attendance'), icon: CalendarCheck },
           { href: '/timetable', label: t('nav.timetable', 'Schedule'), icon: Clock },
-          { href: '/notes', label: t('nav.notes', 'Notes'), icon: BookOpen },
           { label: 'More', icon: Menu, isMenuTrigger: true },
         ];
       case 'parent':
       default:
         return [
           { href: '/dashboard', label: 'Home', icon: LayoutDashboard },
+          { href: '/online-classes', label: 'Zoom Class', icon: Video },
           { href: '/fees', label: t('nav.fees', 'Fees'), icon: CreditCard },
           { href: '/attendance', label: t('nav.attendance', 'Attendance'), icon: CalendarCheck },
-          { href: '/timetable', label: t('nav.timetable', 'Timetable'), icon: Clock },
           { label: 'More', icon: Menu, isMenuTrigger: true },
         ];
     }

@@ -30,6 +30,7 @@ import { OnlineClass, Subject, ClassBatch, UserProfile } from '@/types/app.types
 import { SchemaNotice } from '@/components/common/schema-notice';
 import {
   getLocalDataForInstitute,
+  saveLocalData,
   appendLocalData,
   syncLocalWithRemote,
   updateLocalData,
@@ -64,6 +65,70 @@ function formatDate(dateStr?: string): string {
   }
 }
 
+function getInitialSeedOnlineClasses(targetInstId: string, classBatchId?: string): OnlineClass[] {
+  const today = new Date().toISOString().split('T')[0];
+  const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0];
+  const inTwoDays = new Date(Date.now() + 172800000).toISOString().split('T')[0];
+  const cId = classBatchId || '00000000-0000-0000-0000-000000000002';
+
+  return [
+    {
+      id: 'zoom-live-session-1',
+      institute_id: targetInstId,
+      class_id: cId,
+      subject_id: 'sub-math-live',
+      teacher_id: null,
+      teacher_name: 'Dr. Sarah Mathews (Mathematics)',
+      title: 'Mathematics: Live Algebra & Problem Solving Masterclass',
+      description: 'Interactive doubt clearance session with live whiteboard walkthroughs and exam questions review.',
+      date: today,
+      start_time: '10:00',
+      end_time: '11:00',
+      zoom_url: 'https://zoom.us/j/84529104421?pwd=mathlive2026',
+      meeting_id: '845 2910 4421',
+      passcode: 'math2026',
+      status: 'live',
+      created_at: new Date().toISOString(),
+    },
+    {
+      id: 'zoom-upcoming-session-1',
+      institute_id: targetInstId,
+      class_id: cId,
+      subject_id: 'sub-phy-up',
+      teacher_id: null,
+      teacher_name: 'Prof. Rajesh Nair (Physics)',
+      title: 'Physics: Ray Optics & Snell Law Live Demonstration',
+      description: 'Demonstration of light reflection principles with live interactive digital simulator apparatus.',
+      date: tomorrow,
+      start_time: '11:30',
+      end_time: '12:30',
+      zoom_url: 'https://zoom.us/j/93128405122?pwd=phylive2026',
+      meeting_id: '931 2840 5122',
+      passcode: 'phy2026',
+      status: 'scheduled',
+      created_at: new Date().toISOString(),
+    },
+    {
+      id: 'zoom-upcoming-session-2',
+      institute_id: targetInstId,
+      class_id: cId,
+      subject_id: 'sub-eng-up',
+      teacher_id: null,
+      teacher_name: 'Mrs. Anita Menon (English)',
+      title: 'English Literature: Critical Essay Writing & Board Tips',
+      description: 'Deep dive into drama excerpts and scoring structure for terminal board examinations.',
+      date: inTwoDays,
+      start_time: '14:00',
+      end_time: '15:00',
+      zoom_url: 'https://zoom.us/j/77219403810?pwd=englive2026',
+      meeting_id: '772 1940 3810',
+      passcode: 'eng2026',
+      status: 'scheduled',
+      created_at: new Date().toISOString(),
+    },
+  ];
+}
+
 export default function OnlineClassesPage() {
   const { user, institute, activeChild, loading: authLoading } = useAuth();
   const { t } = useTranslation();
@@ -82,7 +147,7 @@ export default function OnlineClassesPage() {
 
   const [selectedClassId, setSelectedClassId] = useState<string>('all');
   const [selectedSubjectId, setSelectedSubjectId] = useState<string>('all');
-  const [activeTab, setActiveTab] = useState<'upcoming' | 'completed'>('upcoming');
+  const [activeTab, setActiveTab] = useState<'all' | 'live' | 'upcoming' | 'completed'>('all');
 
   const [loading, setLoading] = useState(false);
   const [schemaMissing, setSchemaMissing] = useState(false);
@@ -186,19 +251,40 @@ export default function OnlineClassesPage() {
         const { data, error } = await q;
         if (error && (error.code === 'PGRST205' || error.code === '42P01')) {
           setSchemaMissing(true);
-          setOnlineClasses(getLocalDataForInstitute<OnlineClass>('onlineClasses', instId));
+          const local = getLocalDataForInstitute<OnlineClass>('onlineClasses', instId);
+          if (local.length > 0) {
+            setOnlineClasses(local);
+          } else {
+            const seeded = getInitialSeedOnlineClasses(instId || 'default-inst', classesList[0]?.id);
+            setOnlineClasses(seeded);
+            saveLocalData('onlineClasses', seeded);
+          }
         } else if (data && data.length > 0) {
-          setOnlineClasses(syncLocalWithRemote('onlineClasses', data as OnlineClass[]));
+          setOnlineClasses(syncLocalWithRemote('onlineClasses', data as OnlineClass[], instId));
         } else {
-          setOnlineClasses(getLocalDataForInstitute<OnlineClass>('onlineClasses', instId));
+          const local = getLocalDataForInstitute<OnlineClass>('onlineClasses', instId);
+          if (local.length > 0) {
+            setOnlineClasses(local);
+          } else {
+            const seeded = getInitialSeedOnlineClasses(instId || 'default-inst', classesList[0]?.id);
+            setOnlineClasses(seeded);
+            saveLocalData('onlineClasses', seeded);
+          }
         }
       } catch {
-        setOnlineClasses(getLocalDataForInstitute<OnlineClass>('onlineClasses', instId));
+        const local = getLocalDataForInstitute<OnlineClass>('onlineClasses', instId);
+        if (local.length > 0) {
+          setOnlineClasses(local);
+        } else {
+          const seeded = getInitialSeedOnlineClasses(instId || 'default-inst', classesList[0]?.id);
+          setOnlineClasses(seeded);
+          saveLocalData('onlineClasses', seeded);
+        }
       }
     } finally {
       setLoading(false);
     }
-  }, [supabase, instId, user?.role]);
+  }, [supabase, instId, user?.role, classesList]);
 
   useEffect(() => {
     fetchData();
@@ -412,23 +498,54 @@ export default function OnlineClassesPage() {
     }
   };
 
+  // Quick toggle status for teachers
+  const handleToggleStatus = async (item: OnlineClass, newStatus: 'scheduled' | 'live' | 'completed') => {
+    const updates: Partial<OnlineClass> = { status: newStatus, updated_at: new Date().toISOString() };
+    try {
+      await (supabase as any).from('online_classes').update(updates).eq('id', item.id);
+    } catch (err) {
+      console.warn('Update remote status fallback:', err);
+    }
+
+    updateLocalData('onlineClasses', item.id, updates, instId);
+    setOnlineClasses((prev) =>
+      prev.map((c) => (c.id === item.id ? { ...c, ...updates } : c))
+    );
+    setActionNotice({
+      type: 'success',
+      text: `Zoom Class "${item.title}" is now marked as ${newStatus.toUpperCase()}!`,
+    });
+    setTimeout(() => setActionNotice(null), 3500);
+  };
+
   // Filter Online Classes
   const todayStr = new Date().toISOString().split('T')[0];
+
+  const liveClassesList = onlineClasses.filter(
+    (item) => item.status === 'live' || (item.date === todayStr && item.status === 'scheduled')
+  );
+  const upcomingClassesList = onlineClasses.filter(
+    (item) => item.status === 'scheduled' && item.date >= todayStr
+  );
+  const completedClassesList = onlineClasses.filter(
+    (item) => item.status === 'completed' || item.status === 'cancelled' || item.date < todayStr
+  );
 
   const filteredClasses = onlineClasses.filter((item) => {
     if (selectedClassId !== 'all' && item.class_id !== selectedClassId) return false;
     if (selectedSubjectId !== 'all' && item.subject_id !== selectedSubjectId) return false;
 
-    if (activeTab === 'upcoming') {
-      return item.status !== 'completed' && item.status !== 'cancelled';
-    } else {
-      return item.status === 'completed' || item.status === 'cancelled';
+    if (activeTab === 'live') {
+      return item.status === 'live' || (item.date === todayStr && item.status === 'scheduled');
     }
+    if (activeTab === 'upcoming') {
+      return item.status === 'scheduled' && item.date >= todayStr;
+    }
+    if (activeTab === 'completed') {
+      return item.status === 'completed' || item.status === 'cancelled' || item.date < todayStr;
+    }
+    return true; // 'all'
   });
-
-  const liveClassesCount = onlineClasses.filter(
-    (item) => item.status === 'live' || (item.date === todayStr && item.status === 'scheduled')
-  ).length;
 
   return (
     <div className="space-y-5 animate-in fade-in duration-300">
@@ -482,30 +599,63 @@ export default function OnlineClassesPage() {
       {/* Filter & Tab Controls */}
       <div className="bg-white rounded-3xl p-4 sm:p-5 border border-slate-100 shadow-sm space-y-3">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          {/* Status Tabs */}
-          <div className="flex items-center p-1 bg-slate-100 rounded-2xl">
+          {/* Status Tabs: All, Live Now, Upcoming, Completed */}
+          <div className="flex items-center p-1 bg-slate-100 rounded-2xl overflow-x-auto scrollbar-none max-w-full">
             <button
-              onClick={() => setActiveTab('upcoming')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
-                activeTab === 'upcoming'
+              onClick={() => setActiveTab('all')}
+              className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-all shrink-0 ${
+                activeTab === 'all'
                   ? 'bg-white text-slate-900 shadow-sm'
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              <span>Upcoming & Live</span>
-              {liveClassesCount > 0 && (
-                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span>All Classes</span>
+              <span className="text-[10px] bg-slate-200 text-slate-700 px-1.5 py-0.2 rounded-md font-bold">
+                {onlineClasses.length}
+              </span>
+            </button>
+            <button
+              onClick={() => setActiveTab('live')}
+              className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-all shrink-0 ${
+                activeTab === 'live'
+                  ? 'bg-white text-rose-600 shadow-sm'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <Radio className="w-3 h-3 text-rose-500 animate-pulse" />
+              <span>Live Now</span>
+              {liveClassesList.length > 0 && (
+                <span className="text-[10px] bg-rose-100 text-rose-700 px-1.5 py-0.2 rounded-md font-black">
+                  {liveClassesList.length}
+                </span>
               )}
             </button>
             <button
+              onClick={() => setActiveTab('upcoming')}
+              className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-all shrink-0 ${
+                activeTab === 'upcoming'
+                  ? 'bg-white text-indigo-700 shadow-sm'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <Calendar className="w-3 h-3 text-indigo-600" />
+              <span>Upcoming</span>
+              <span className="text-[10px] bg-indigo-50 text-indigo-700 px-1.5 py-0.2 rounded-md font-bold">
+                {upcomingClassesList.length}
+              </span>
+            </button>
+            <button
               onClick={() => setActiveTab('completed')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+              className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-all shrink-0 ${
                 activeTab === 'completed'
                   ? 'bg-white text-slate-900 shadow-sm'
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              <span>Completed History</span>
+              <span>History</span>
+              <span className="text-[10px] bg-slate-200 text-slate-700 px-1.5 py-0.2 rounded-md font-bold">
+                {completedClassesList.length}
+              </span>
             </button>
           </div>
 
@@ -544,6 +694,44 @@ export default function OnlineClassesPage() {
         </div>
       </div>
 
+      {/* Prominent Live Broadcast Hero Banner (Shown when a lecture is active) */}
+      {liveClassesList.length > 0 && activeTab !== 'completed' && (
+        <div className="bg-gradient-to-r from-rose-600 via-rose-700 to-indigo-900 text-white rounded-3xl p-5 shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 border border-rose-400/30">
+          <div className="flex items-start gap-3">
+            <div className="w-12 h-12 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center shrink-0">
+              <Radio className="w-6 h-6 text-white animate-pulse" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-[10px] font-black uppercase tracking-wider bg-white text-rose-700 px-2.5 py-0.5 rounded-full shadow-sm">
+                  ● LIVE BROADCAST IN PROGRESS
+                </span>
+                <span className="text-xs text-rose-100 font-bold">
+                  {liveClassesList[0].teacher_name}
+                </span>
+              </div>
+              <h3 className="text-base sm:text-lg font-bold text-white mt-1">
+                {liveClassesList[0].title}
+              </h3>
+              <p className="text-xs text-rose-100 mt-0.5">
+                Class Time: {formatTime(liveClassesList[0].start_time)} - {formatTime(liveClassesList[0].end_time)}
+                {liveClassesList[0].meeting_id ? ` • Zoom Meeting ID: ${liveClassesList[0].meeting_id}` : ''}
+              </p>
+            </div>
+          </div>
+          <a
+            href={liveClassesList[0].zoom_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="bg-white hover:bg-rose-50 text-rose-700 px-6 py-3.5 rounded-2xl text-xs font-black shadow-lg flex items-center justify-center gap-2 active:scale-95 transition-all shrink-0 min-h-[44px]"
+          >
+            <Video className="w-4 h-4 text-rose-600" />
+            <span>Join Live Room (1-Tap)</span>
+            <ExternalLink className="w-3.5 h-3.5" />
+          </a>
+        </div>
+      )}
+
       {/* Classes List */}
       {loading ? (
         <div className="p-12 text-center text-slate-400">
@@ -556,24 +744,30 @@ export default function OnlineClassesPage() {
             <Video className="w-7 h-7" />
           </div>
           <h3 className="text-sm font-bold text-slate-800">
-            {activeTab === 'upcoming' ? 'No Upcoming Zoom Classes' : 'No Completed Classes'}
+            {activeTab === 'live'
+              ? 'No Live Zoom Classes Right Now'
+              : activeTab === 'upcoming'
+              ? 'No Upcoming Zoom Classes'
+              : 'No Classes in this Category'}
           </h3>
           <p className="text-xs text-slate-400 max-w-sm mx-auto leading-relaxed">
-            {activeTab === 'upcoming'
+            {activeTab === 'live'
+              ? 'There are no ongoing live Zoom broadcasts at this exact moment. Please check the Upcoming tab for scheduled sessions.'
+              : activeTab === 'upcoming'
               ? isStaff
                 ? 'Click "Schedule Zoom Class" above to create an online meeting link for your students.'
                 : 'Your teachers have not scheduled any upcoming live classes at this moment. Please check back soon.'
               : 'Past online sessions will be recorded and archived here.'}
           </p>
 
-          {isStaff && activeTab === 'upcoming' && (
+          {isStaff && (
             <div className="pt-2">
               <button
                 onClick={() => setShowAddModal(true)}
                 className="inline-flex items-center gap-2 bg-[#4338ca] hover:bg-[#3730a3] text-white text-xs font-bold py-2.5 px-5 rounded-2xl shadow-sm transition-all"
               >
                 <Plus className="w-4 h-4" />
-                <span>Schedule First Zoom Class</span>
+                <span>Schedule New Zoom Class</span>
               </button>
             </div>
           )}
@@ -689,7 +883,15 @@ export default function OnlineClassesPage() {
                       }`}
                     >
                       <Video className="w-4 h-4" />
-                      <span>{isStaff ? 'Start Class (Host)' : 'Join Zoom Class'}</span>
+                      <span>
+                        {isStaff
+                          ? isLive
+                            ? 'Manage Live Class'
+                            : 'Start Class (Host)'
+                          : isLive
+                          ? 'Join Live Class Now'
+                          : 'Join Zoom Room'}
+                      </span>
                       <ExternalLink className="w-3.5 h-3.5 opacity-80" />
                     </a>
 
@@ -708,23 +910,49 @@ export default function OnlineClassesPage() {
                     </button>
                   </div>
 
-                  {/* Staff Management Links */}
+                  {/* Staff Host Controls: Toggle Live Status & Edit / Delete */}
                   {isStaff && (
-                    <div className="flex items-center justify-end gap-3 pt-1 text-[11px] font-semibold text-slate-500">
-                      <button
-                        onClick={() => handleStartEdit(item)}
-                        className="hover:text-indigo-600 flex items-center gap-1 transition-colors"
-                      >
-                        <Pencil className="w-3 h-3" />
-                        <span>Edit Link / Time</span>
-                      </button>
-                      <button
-                        onClick={() => handleDelete(item.id, item.title)}
-                        className="hover:text-rose-600 flex items-center gap-1 transition-colors"
-                      >
-                        <Trash2 className="w-3 h-3" />
-                        <span>Cancel / Delete</span>
-                      </button>
+                    <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-100 text-[11px] font-semibold text-slate-500">
+                      <div className="flex items-center gap-1.5">
+                        {item.status !== 'live' ? (
+                          <button
+                            type="button"
+                            onClick={() => handleToggleStatus(item, 'live')}
+                            className="text-rose-600 hover:text-rose-700 font-bold flex items-center gap-1 bg-rose-50 px-2 py-1 rounded-lg"
+                            title="Set to Live status"
+                          >
+                            <Radio className="w-3 h-3" />
+                            <span>Set Live</span>
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => handleToggleStatus(item, 'completed')}
+                            className="text-slate-600 hover:text-slate-800 font-bold flex items-center gap-1 bg-slate-100 px-2 py-1 rounded-lg"
+                            title="End live broadcast"
+                          >
+                            <Check className="w-3 h-3 text-emerald-600" />
+                            <span>End Session</span>
+                          </button>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-3">
+                        <button
+                          onClick={() => handleStartEdit(item)}
+                          className="hover:text-indigo-600 flex items-center gap-1 transition-colors"
+                        >
+                          <Pencil className="w-3 h-3" />
+                          <span>Edit</span>
+                        </button>
+                        <button
+                          onClick={() => handleDelete(item.id, item.title)}
+                          className="hover:text-rose-600 flex items-center gap-1 transition-colors"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                          <span>Delete</span>
+                        </button>
+                      </div>
                     </div>
                   )}
                 </div>

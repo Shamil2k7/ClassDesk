@@ -129,6 +129,7 @@ export default function AttendancePage() {
   // State
   const [classesList, setClassesList] = useState<ClassBatch[]>([]);
   const [selectedClassId, setSelectedClassId] = useState<string>('');
+  const [selectedSection, setSelectedSection] = useState<string>('all');
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [classStudents, setClassStudents] = useState<Student[]>([]);
   const [attendanceData, setAttendanceData] = useState<Record<string, AttendanceStatus>>({});
@@ -329,14 +330,43 @@ export default function AttendancePage() {
     }
   }, [isStaff, activeChild, supabase, instId]);
 
+  // Current Class & Sections derivation
+  const currentClassObj = classesList.find((c) => c.id === selectedClassId);
+  const currentClassName = currentClassObj?.name || '';
+
+  // Find all sibling batches sharing the same class grade/name
+  const siblingBatches = currentClassName
+    ? classesList.filter((c) => c.name.trim().toLowerCase() === currentClassName.trim().toLowerCase())
+    : [];
+
+  // Determine all available sections for this class
+  const availableSections = Array.from(
+    new Set(
+      [
+        ...classStudents.map((s) => (s as any).section).filter(Boolean),
+        ...siblingBatches.map((b) => b.section).filter(Boolean),
+        currentClassObj?.section,
+        'A',
+        'B',
+      ].filter(Boolean)
+    )
+  ) as string[];
+
+  // Filter students based on selected section
+  const displayedStudents = classStudents.filter((s) => {
+    if (selectedSection === 'all') return true;
+    const stuSec = (s as any).section || currentClassObj?.section || 'A';
+    return stuSec.trim().toUpperCase() === selectedSection.trim().toUpperCase();
+  });
+
   const setStudentStatus = (studentId: string, status: AttendanceStatus) => {
     setAttendanceData((prev) => ({ ...prev, [studentId]: status }));
     setAlertNotice(null);
   };
 
   const handleMarkAllPresent = () => {
-    const updated: Record<string, AttendanceStatus> = {};
-    classStudents.forEach((s) => {
+    const updated: Record<string, AttendanceStatus> = { ...attendanceData };
+    displayedStudents.forEach((s) => {
       updated[s.id] = 'present';
     });
     setAttendanceData(updated);
@@ -835,9 +865,9 @@ export default function AttendancePage() {
   // -------------------------------------------------------------
   // TEACHER / ADMIN 1-TAP ATTENDANCE MATRIX
   // -------------------------------------------------------------
-  const presentCount = classStudents.filter((s) => (attendanceData[s.id] || 'present') === 'present').length;
-  const absentCount = classStudents.filter((s) => attendanceData[s.id] === 'absent').length;
-  const lateCount = classStudents.filter((s) => attendanceData[s.id] === 'late').length;
+  const presentCount = displayedStudents.filter((s) => (attendanceData[s.id] || 'present') === 'present').length;
+  const absentCount = displayedStudents.filter((s) => attendanceData[s.id] === 'absent').length;
+  const lateCount = displayedStudents.filter((s) => attendanceData[s.id] === 'late').length;
 
   return (
     <div className="space-y-4 animate-in fade-in duration-300">
@@ -851,27 +881,31 @@ export default function AttendancePage() {
               {t('attendance.title', 'Daily Attendance')}
             </h2>
             <p className="text-xs text-slate-500">
-              Single-screen 1-tap roll call for the whole batch
+              Single-screen 1-tap roll call with section-wise student filtering
             </p>
           </div>
 
-          {/* Quick Mark All Present Button */}
-          {classStudents.length > 0 && (
+          {/* Quick Mark All Present Button for Selected Section */}
+          {displayedStudents.length > 0 && (
             <button
               onClick={handleMarkAllPresent}
               className="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 px-3.5 py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all active:scale-95 min-h-[40px]"
             >
               <Check className="w-4 h-4 text-emerald-600" />
-              <span>{t('attendance.markAllPresent', 'Mark All Present (1-Tap)')}</span>
+              <span>
+                {selectedSection === 'all'
+                  ? t('attendance.markAllPresent', 'Mark All Present (1-Tap)')
+                  : `Mark All Section ${selectedSection} Present`}
+              </span>
             </button>
           )}
         </div>
 
-        {/* Filter Row: Class Selector + Date Picker */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-slate-100">
+        {/* Filter Row: Class Selector + Section Selector + Date Picker */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 border-t border-slate-100">
           <div>
             <label className="block text-[11px] font-bold text-slate-500 uppercase mb-1">
-              {t('attendance.selectClass', 'Class / Batch')}
+              {t('attendance.selectClass', 'Class / Grade')}
             </label>
             {classesList.length === 0 ? (
               <div className="flex items-center gap-2">
@@ -887,16 +921,47 @@ export default function AttendancePage() {
             ) : (
               <select
                 value={selectedClassId}
-                onChange={(e) => setSelectedClassId(e.target.value)}
+                onChange={(e) => {
+                  setSelectedClassId(e.target.value);
+                  setSelectedSection('all');
+                }}
                 className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
               >
                 {classesList.map((c) => (
                   <option key={c.id} value={c.id}>
-                    {c.name} - Section {c.section}
+                    {c.name} {c.section ? `- Section ${c.section}` : ''}
                   </option>
                 ))}
               </select>
             )}
+          </div>
+
+          <div>
+            <label className="block text-[11px] font-bold text-slate-500 uppercase mb-1">
+              Section (Separate Roll Call)
+            </label>
+            <select
+              value={selectedSection}
+              onChange={(e) => {
+                const sec = e.target.value;
+                setSelectedSection(sec);
+                // If a sibling batch exists matching this section, sync class batch
+                const matchedBatch = siblingBatches.find(
+                  (b) => b.section?.trim().toUpperCase() === sec.trim().toUpperCase()
+                );
+                if (matchedBatch && matchedBatch.id !== selectedClassId) {
+                  setSelectedClassId(matchedBatch.id);
+                }
+              }}
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            >
+              <option value="all">All Sections ({classStudents.length} Students)</option>
+              {availableSections.map((sec) => (
+                <option key={sec} value={sec}>
+                  Section {sec}
+                </option>
+              ))}
+            </select>
           </div>
 
           <div>
@@ -912,8 +977,64 @@ export default function AttendancePage() {
           </div>
         </div>
 
-        {/* Attendance Counter Strip */}
-        {classStudents.length > 0 && (
+        {/* Section Quick Toggle Pills */}
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none pt-1">
+          <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 mr-1 shrink-0">
+            Section:
+          </span>
+          <button
+            type="button"
+            onClick={() => setSelectedSection('all')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 active:scale-95 ${
+              selectedSection === 'all'
+                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-100 ring-2 ring-indigo-300'
+                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+            }`}
+          >
+            All Sections
+          </button>
+          {availableSections.map((sec) => {
+            const countInSec = classStudents.filter((s) => {
+              const stuSec = (s as any).section || currentClassObj?.section || 'A';
+              return stuSec.trim().toUpperCase() === sec.trim().toUpperCase();
+            }).length;
+
+            return (
+              <button
+                key={sec}
+                type="button"
+                onClick={() => {
+                  setSelectedSection(sec);
+                  const matchedBatch = siblingBatches.find(
+                    (b) => b.section?.trim().toUpperCase() === sec.trim().toUpperCase()
+                  );
+                  if (matchedBatch && matchedBatch.id !== selectedClassId) {
+                    setSelectedClassId(matchedBatch.id);
+                  }
+                }}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 active:scale-95 flex items-center gap-1.5 ${
+                  selectedSection === sec
+                    ? 'bg-indigo-600 text-white shadow-md shadow-indigo-100 ring-2 ring-indigo-300'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                <span>Section {sec}</span>
+                {countInSec > 0 && (
+                  <span
+                    className={`text-[10px] px-1.5 py-0.2 rounded-md ${
+                      selectedSection === sec ? 'bg-indigo-700 text-white' : 'bg-slate-200 text-slate-700'
+                    }`}
+                  >
+                    {countInSec}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Attendance Counter Strip for Displayed Section */}
+        {displayedStudents.length > 0 && (
           <div className="grid grid-cols-3 gap-2 bg-slate-50 p-2.5 rounded-2xl text-center">
             <div className="text-emerald-700 font-bold text-xs">
               Present: <span className="text-sm font-black">{presentCount}</span>
@@ -961,10 +1082,27 @@ export default function AttendancePage() {
             </Link>
           </div>
         </div>
+      ) : displayedStudents.length === 0 ? (
+        <div className="bg-white rounded-3xl p-10 border border-slate-200 text-center space-y-3">
+          <Users className="w-10 h-10 text-slate-300 mx-auto" />
+          <h3 className="text-sm font-bold text-slate-800">No Students in Section {selectedSection}</h3>
+          <p className="text-xs text-slate-500 max-w-sm mx-auto">
+            There are currently no students assigned to Section {selectedSection} in this class.
+          </p>
+          <button
+            type="button"
+            onClick={() => setSelectedSection('all')}
+            className="text-xs font-bold text-indigo-600 hover:underline"
+          >
+            Show All Sections ({classStudents.length} Students)
+          </button>
+        </div>
       ) : (
         <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden divide-y divide-slate-100">
-          {classStudents.map((student) => {
+          {displayedStudents.map((student) => {
             const currentStatus = attendanceData[student.id] || 'present';
+            const studentSec = (student as any).section || currentClassObj?.section || 'A';
+
             return (
               <div
                 key={student.id}
@@ -976,9 +1114,14 @@ export default function AttendancePage() {
                     {student.roll_number || 'ST'}
                   </div>
                   <div className="min-w-0">
-                    <p className="text-xs sm:text-sm font-bold text-slate-900 truncate">
-                      {student.full_name}
-                    </p>
+                    <div className="flex items-center gap-2">
+                      <p className="text-xs sm:text-sm font-bold text-slate-900 truncate">
+                        {student.full_name}
+                      </p>
+                      <span className="text-[10px] font-black px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 uppercase shrink-0">
+                        Sec {studentSec}
+                      </span>
+                    </div>
                     <p className="text-[10px] text-slate-400 truncate">
                       Parent: {student.parent_name || 'Guardian'} ({student.parent_phone})
                     </p>

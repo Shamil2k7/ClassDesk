@@ -19,6 +19,7 @@ import {
   LogOut,
   ShieldAlert,
   Sparkles,
+  Video,
 } from 'lucide-react';
 
 export function DesktopSidebar() {
@@ -49,6 +50,7 @@ export function DesktopSidebar() {
         ]),
     ...(role === 'institute_admin'
       ? [
+          { href: '/online-classes', label: 'Zoom Online Classes', icon: Video },
           { href: '/classes', label: t('nav.classes', 'Classes & Batches'), icon: Users },
           { href: '/teachers', label: t('nav.teachers', 'Teachers'), icon: Users },
           { href: '/students', label: t('nav.students', 'Students'), icon: Users },
@@ -63,6 +65,7 @@ export function DesktopSidebar() {
       : []),
     ...(role === 'teacher'
       ? [
+          { href: '/online-classes', label: 'Zoom Online Classes', icon: Video },
           { href: '/attendance', label: t('nav.attendance', 'Attendance'), icon: CalendarCheck },
           { href: '/timetable', label: t('nav.timetable', 'Schedule'), icon: Clock },
           { href: '/notes', label: t('nav.notes', 'Notes & Materials'), icon: BookOpen },
@@ -73,6 +76,7 @@ export function DesktopSidebar() {
       : []),
     ...(role === 'parent'
       ? [
+          { href: '/online-classes', label: 'Zoom Online Classes', icon: Video },
           { href: '/fees', label: t('nav.fees', 'Fees & Receipts'), icon: CreditCard },
           { href: '/attendance', label: t('nav.attendance', 'Attendance'), icon: CalendarCheck },
           { href: '/notes', label: t('nav.notes', 'Notes & Materials'), icon: BookOpen },

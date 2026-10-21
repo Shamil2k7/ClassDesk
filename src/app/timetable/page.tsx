@@ -518,28 +518,6 @@ export default function TimetablePage() {
         </div>
       </div>
 
-      {/* Live Online Classes Banner */}
-      <div className="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-2xl p-3.5 border border-indigo-100 flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2.5 min-w-0">
-          <div className="w-8 h-8 rounded-xl bg-indigo-600 text-white flex items-center justify-center shrink-0 shadow-sm">
-            <Video className="w-4 h-4" />
-          </div>
-          <div className="min-w-0">
-            <p className="text-xs font-bold text-slate-900 truncate">Live Online Zoom Classes</p>
-            <p className="text-[11px] text-slate-500 truncate">
-              Schedule or join live interactive Zoom video lectures & webinars
-            </p>
-          </div>
-        </div>
-        <Link
-          href="/online-classes"
-          className="bg-white hover:bg-indigo-50 border border-indigo-200 text-[#4338ca] text-xs font-bold px-3 py-1.5 rounded-xl transition-all shrink-0 flex items-center gap-1 shadow-sm"
-        >
-          <span>Open Zoom Classes</span>
-          <span>→</span>
-        </Link>
-      </div>
-
       {/* Day Selector Pills */}
       <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
         {days.map((d) => {
