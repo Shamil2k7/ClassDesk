@@ -89,7 +89,6 @@ export function TopBar() {
     setShowProfileMenu(false);
     setMobileNavOpen(false);
     await logout();
-    router.replace('/login');
   };
 
   const unreadCount = notifications.filter((n) => !n.is_read).length;

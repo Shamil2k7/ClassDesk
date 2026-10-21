@@ -29,7 +29,6 @@ export function DesktopSidebar() {
 
   const handleLogout = async () => {
     await logout();
-    router.replace('/login');
   };
 
   if (pathname === '/login') {

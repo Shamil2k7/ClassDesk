@@ -53,6 +53,22 @@ export default function LoginPage() {
     }
   }, [authLoading, isAuthenticated, user, router]);
 
+  // Trap back navigation on login page so pressing back doesn't re-enter protected pages
+  React.useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    window.history.pushState(null, '', window.location.href);
+
+    const handlePopState = () => {
+      window.history.pushState(null, '', window.location.href);
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, []);
+
   // Handle Email & Password Login
   const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -71,7 +87,7 @@ export default function LoginPage() {
         setSuccessMessage('Login successful! Redirecting...');
         setTimeout(() => {
           const target = email.toLowerCase().includes('super') ? '/super-admin' : '/dashboard';
-          router.push(target);
+          router.replace(target);
         }, 400);
       } else {
         setErrorMessage(result.message || 'Invalid email or password. Please try again.');
@@ -131,7 +147,7 @@ export default function LoginPage() {
           const savedRole = localStorage.getItem('classdesk_demo_role');
           const clean = phone.replace(/\D/g, '');
           const target = (savedRole === 'super_admin' || clean === '9876543211') ? '/super-admin' : '/dashboard';
-          router.push(target);
+          router.replace(target);
         }, 400);
       } else {
         setErrorMessage(res.message || 'Invalid or expired OTP. Please try again.');

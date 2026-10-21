@@ -6,6 +6,7 @@ import { TopBar } from '@/components/common/top-bar';
 import { BottomNav } from '@/components/common/bottom-nav';
 import { DesktopSidebar } from '@/components/common/desktop-sidebar';
 import { PwaInstallPrompt } from '@/components/pwa/pwa-install-prompt';
+import { AuthGuard } from '@/components/common/auth-guard';
 
 export const metadata: Metadata = {
   title: 'ClassDesk - School & Tuition SaaS',
@@ -40,15 +41,17 @@ export default function RootLayout({
       <body className="antialiased min-h-screen bg-slate-50 flex flex-col text-slate-900 selection:bg-indigo-100 selection:text-indigo-900">
         <I18nProvider>
           <AuthProvider>
-            <TopBar />
-            <div className="flex-1 flex max-w-7xl w-full mx-auto">
-              <DesktopSidebar />
-              <main className="flex-1 min-w-0 p-3.5 sm:p-6 pb-24 sm:pb-8 max-w-5xl mx-auto w-full">
-                {children}
-              </main>
-            </div>
-            <BottomNav />
-            <PwaInstallPrompt />
+            <AuthGuard>
+              <TopBar />
+              <div className="flex-1 flex max-w-7xl w-full mx-auto">
+                <DesktopSidebar />
+                <main className="flex-1 min-w-0 p-3.5 sm:p-6 pb-24 sm:pb-8 max-w-5xl mx-auto w-full">
+                  {children}
+                </main>
+              </div>
+              <BottomNav />
+              <PwaInstallPrompt />
+            </AuthGuard>
           </AuthProvider>
         </I18nProvider>
       </body>

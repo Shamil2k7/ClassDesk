@@ -801,7 +801,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     localStorage.removeItem('classdesk_active_institute');
 
     if (typeof window !== 'undefined') {
-      window.location.href = '/login';
+      sessionStorage.clear();
+      window.location.replace('/login');
     }
   };
 

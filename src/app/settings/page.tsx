@@ -41,7 +41,6 @@ export default function SettingsPage() {
   const handleLogout = async () => {
     setIsLoggingOut(true);
     await logout();
-    router.replace('/login');
   };
 
   const toggleSetting = (key: keyof NotificationSettings) => {
