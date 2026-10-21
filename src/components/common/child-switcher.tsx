@@ -14,11 +14,11 @@ export function ChildSwitcher() {
   if (user?.role !== 'parent' || linkedChildren.length <= 1) {
     if (user?.role === 'parent' && activeChild) {
       return (
-        <div className="flex items-center gap-2 bg-indigo-50 border border-indigo-200 text-indigo-900 px-3 py-1.5 rounded-full text-xs font-medium">
-          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-          <span>{activeChild.full_name}</span>
-          <span className="text-indigo-400">|</span>
-          <span className="text-indigo-600">Roll {activeChild.roll_number}</span>
+        <div className="flex items-center gap-1.5 xs:gap-2 bg-indigo-50 border border-indigo-200 text-indigo-900 px-2.5 py-1 rounded-full text-xs font-medium max-w-[140px] xs:max-w-none">
+          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0"></span>
+          <span className="truncate max-w-[70px] xs:max-w-[120px]">{activeChild.full_name}</span>
+          <span className="text-indigo-400 hidden xs:inline">|</span>
+          <span className="text-indigo-600 hidden xs:inline">Roll {activeChild.roll_number}</span>
         </div>
       );
     }

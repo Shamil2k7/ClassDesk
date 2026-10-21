@@ -17,7 +17,15 @@ import {
   Building2,
   Users,
   ShieldAlert,
+  Menu,
 } from 'lucide-react';
+
+interface BottomNavItem {
+  href?: string;
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+  isMenuTrigger?: boolean;
+}
 
 export function BottomNav() {
   const pathname = usePathname();
@@ -31,21 +39,22 @@ export function BottomNav() {
   const role = user?.role || 'parent';
 
   // Define role-specific navigation tabs (Mobile Thumb Zone ergonomics)
-  const getNavItems = () => {
+  const getNavItems = (): BottomNavItem[] => {
     switch (role) {
       case 'super_admin':
         return [
-          { href: '/super-admin', label: 'SaaS Admin', icon: ShieldAlert },
+          { href: '/super-admin', label: 'Admin', icon: ShieldAlert },
           { href: '/institutes', label: 'Institutes', icon: Building2 },
           { href: '/settings', label: t('nav.settings', 'Settings'), icon: Settings },
+          { label: 'Menu', icon: Menu, isMenuTrigger: true },
         ];
       case 'institute_admin':
         return [
-          { href: '/dashboard', label: t('nav.dashboard', 'Dashboard'), icon: LayoutDashboard },
+          { href: '/dashboard', label: t('nav.dashboard', 'Home'), icon: LayoutDashboard },
           { href: '/attendance', label: t('nav.attendance', 'Attendance'), icon: CalendarCheck },
           { href: '/fees', label: t('nav.fees', 'Fees'), icon: CreditCard },
           { href: '/classes', label: t('nav.classes', 'Classes'), icon: Users },
-          { href: '/exams', label: t('nav.exams', 'Exams'), icon: Award },
+          { label: 'More', icon: Menu, isMenuTrigger: true },
         ];
       case 'teacher':
         return [
@@ -53,7 +62,7 @@ export function BottomNav() {
           { href: '/attendance', label: t('nav.attendance', 'Attendance'), icon: CalendarCheck },
           { href: '/timetable', label: t('nav.timetable', 'Schedule'), icon: Clock },
           { href: '/notes', label: t('nav.notes', 'Notes'), icon: BookOpen },
-          { href: '/announcements', label: t('nav.announcements', 'Notices'), icon: FileText },
+          { label: 'More', icon: Menu, isMenuTrigger: true },
         ];
       case 'parent':
       default:
@@ -61,24 +70,52 @@ export function BottomNav() {
           { href: '/dashboard', label: 'Home', icon: LayoutDashboard },
           { href: '/fees', label: t('nav.fees', 'Fees'), icon: CreditCard },
           { href: '/attendance', label: t('nav.attendance', 'Attendance'), icon: CalendarCheck },
-          { href: '/notes', label: t('nav.notes', 'Notes'), icon: BookOpen },
-          { href: '/exams', label: t('nav.exams', 'Exams'), icon: Award },
+          { href: '/timetable', label: t('nav.timetable', 'Timetable'), icon: Clock },
+          { label: 'More', icon: Menu, isMenuTrigger: true },
         ];
     }
   };
 
   const navItems = getNavItems();
+  const mainHrefs = navItems.filter((i) => !i.isMenuTrigger).map((i) => i.href);
+  const isMoreActive = !mainHrefs.includes(pathname);
+
+  const handleOpenDrawer = () => {
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('open-mobile-drawer'));
+    }
+  };
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-slate-200 pb-safe sm:hidden shadow-[0_-4px_12px_rgba(0,0,0,0.05)]">
       <div className="flex items-center justify-around h-16 px-1">
-        {navItems.map((item) => {
-          const isActive = pathname === item.href;
+        {navItems.map((item, idx) => {
           const Icon = item.icon;
+
+          if (item.isMenuTrigger) {
+            return (
+              <button
+                key="menu-trigger"
+                onClick={handleOpenDrawer}
+                className={`flex flex-col items-center justify-center flex-1 py-1 min-h-[48px] touch-manipulation transition-all active:scale-95 ${
+                  isMoreActive ? 'text-indigo-600 font-bold' : 'text-slate-500 hover:text-slate-800'
+                }`}
+                aria-label="Open Full Navigation Menu"
+              >
+                <Icon className={`w-5 h-5 mb-0.5 ${isMoreActive ? 'stroke-[2.5px]' : 'stroke-2'}`} />
+                <span className="text-[10px] leading-tight tracking-tight">{item.label}</span>
+                {isMoreActive && (
+                  <span className="w-1 h-1 rounded-full bg-indigo-600 mt-0.5 animate-pulse" />
+                )}
+              </button>
+            );
+          }
+
+          const isActive = pathname === item.href;
           return (
             <Link
-              key={item.href}
-              href={item.href}
+              key={item.href || idx}
+              href={item.href || '#'}
               className={`flex flex-col items-center justify-center flex-1 py-1 min-h-[48px] touch-manipulation transition-all active:scale-95 ${
                 isActive ? 'text-indigo-600 font-bold' : 'text-slate-500 hover:text-slate-800'
               }`}
