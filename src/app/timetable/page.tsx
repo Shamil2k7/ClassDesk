@@ -17,6 +17,8 @@ import {
   BookOpen,
   AlertCircle,
   CheckCircle2,
+  Video,
+  ExternalLink,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { TimetableEntry, Subject, ClassBatch, UserProfile } from '@/types/app.types';
@@ -76,6 +78,7 @@ export default function TimetablePage() {
   const [startTime, setStartTime] = useState('09:00');
   const [endTime, setEndTime] = useState('09:45');
   const [roomNumber, setRoomNumber] = useState('Room 101');
+  const [zoomUrl, setZoomUrl] = useState('');
   const [isNewSubjectMode, setIsNewSubjectMode] = useState(false);
   const [newSubjectName, setNewSubjectName] = useState('');
   const [formError, setFormError] = useState<string | null>(null);
@@ -88,6 +91,7 @@ export default function TimetablePage() {
   const [editStartTime, setEditStartTime] = useState('09:00');
   const [editEndTime, setEditEndTime] = useState('09:45');
   const [editRoomNumber, setEditRoomNumber] = useState('Room 101');
+  const [editZoomUrl, setEditZoomUrl] = useState('');
   const [editFormError, setEditFormError] = useState<string | null>(null);
 
   const days = [
@@ -328,6 +332,7 @@ export default function TimetablePage() {
       start_time: startTime,
       end_time: endTime,
       room_number: roomNumber?.trim() || 'Room 101',
+      zoom_url: zoomUrl.trim() || null,
     };
 
     try {
@@ -367,6 +372,7 @@ export default function TimetablePage() {
     setEditStartTime(slot.start_time?.slice(0, 5) || '09:00');
     setEditEndTime(slot.end_time?.slice(0, 5) || '09:45');
     setEditRoomNumber(slot.room_number || 'Room 101');
+    setEditZoomUrl((slot as any).zoom_url || '');
     setEditFormError(null);
   };
 
@@ -388,6 +394,7 @@ export default function TimetablePage() {
       start_time: editStartTime,
       end_time: editEndTime,
       room_number: editRoomNumber?.trim() || 'Room 101',
+      zoom_url: editZoomUrl.trim() || null,
     };
 
     try {
@@ -509,6 +516,28 @@ export default function TimetablePage() {
             </button>
           )}
         </div>
+      </div>
+
+      {/* Live Online Classes Banner */}
+      <div className="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-2xl p-3.5 border border-indigo-100 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div className="w-8 h-8 rounded-xl bg-indigo-600 text-white flex items-center justify-center shrink-0 shadow-sm">
+            <Video className="w-4 h-4" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-xs font-bold text-slate-900 truncate">Live Online Zoom Classes</p>
+            <p className="text-[11px] text-slate-500 truncate">
+              Schedule or join live interactive Zoom video lectures & webinars
+            </p>
+          </div>
+        </div>
+        <Link
+          href="/online-classes"
+          className="bg-white hover:bg-indigo-50 border border-indigo-200 text-[#4338ca] text-xs font-bold px-3 py-1.5 rounded-xl transition-all shrink-0 flex items-center gap-1 shadow-sm"
+        >
+          <span>Open Zoom Classes</span>
+          <span>→</span>
+        </Link>
       </div>
 
       {/* Day Selector Pills */}
@@ -640,6 +669,21 @@ export default function TimetablePage() {
                       <MapPin className="w-3 h-3" />
                       <span>{slot.room_number || 'Room 101'}</span>
                     </div>
+
+                    {(slot as any).zoom_url && (
+                      <div className="mt-2 flex justify-end">
+                        <a
+                          href={(slot as any).zoom_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[10px] font-bold bg-[#4338ca] hover:bg-[#3730a3] text-white shadow-sm transition-all"
+                        >
+                          <Video className="w-3 h-3" />
+                          <span>Join Zoom</span>
+                          <ExternalLink className="w-2.5 h-2.5 opacity-80" />
+                        </a>
+                      </div>
+                    )}
                   </div>
 
                   {isStaff && (
@@ -796,6 +840,23 @@ export default function TimetablePage() {
                 </div>
               </div>
 
+              {/* Zoom Link */}
+              <div>
+                <label className="block text-[11px] font-bold text-[#4338ca] uppercase mb-1">
+                  Zoom / Online Class Link (Optional)
+                </label>
+                <div className="relative">
+                  <input
+                    type="url"
+                    value={zoomUrl}
+                    onChange={(e) => setZoomUrl(e.target.value)}
+                    placeholder="https://zoom.us/j/... (Optional)"
+                    className="w-full bg-indigo-50/50 border border-indigo-200 rounded-xl pl-8 pr-3 py-2 text-xs font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                  <Video className="w-3.5 h-3.5 text-indigo-600 absolute left-2.5 top-2.5 pointer-events-none" />
+                </div>
+              </div>
+
               {/* Start & End Times */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
@@ -937,6 +998,23 @@ export default function TimetablePage() {
                     placeholder="e.g. Room 101"
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800"
                   />
+                </div>
+              </div>
+
+              {/* Zoom Meeting Link */}
+              <div>
+                <label className="block text-[11px] font-bold text-[#4338ca] uppercase mb-1">
+                  Zoom / Online Class Link (Optional)
+                </label>
+                <div className="relative">
+                  <input
+                    type="url"
+                    value={editZoomUrl}
+                    onChange={(e) => setEditZoomUrl(e.target.value)}
+                    placeholder="https://zoom.us/j/... (Optional)"
+                    className="w-full bg-indigo-50/50 border border-indigo-200 rounded-xl pl-8 pr-3 py-2 text-xs font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                  <Video className="w-3.5 h-3.5 text-indigo-600 absolute left-2.5 top-2.5 pointer-events-none" />
                 </div>
               </div>
 

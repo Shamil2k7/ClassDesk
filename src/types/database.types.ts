@@ -110,6 +110,7 @@ export interface TimetableRow {
   start_time: string;
   end_time: string;
   room_number: string | null;
+  zoom_url?: string | null;
   created_at: string;
 }
 

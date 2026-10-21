@@ -16,6 +16,7 @@ import {
   MarkRecord,
   NotificationItem,
   NotificationSettings,
+  OnlineClass,
 } from '@/types/app.types';
 
 // Seed data removed as requested - Initialized as empty live database arrays
@@ -35,6 +36,7 @@ export const MOCK_EXAMS: Exam[] = [];
 export const MOCK_EXAM_SUBJECTS: ExamSubject[] = [];
 export const MOCK_MARKS: MarkRecord[] = [];
 export const MOCK_NOTIFICATIONS: NotificationItem[] = [];
+export const MOCK_ONLINE_CLASSES: OnlineClass[] = [];
 
 export const MOCK_NOTIFICATION_SETTINGS: NotificationSettings = {
   id: 'ns-default',

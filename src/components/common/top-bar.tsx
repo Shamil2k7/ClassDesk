@@ -29,6 +29,7 @@ import {
   LayoutDashboard,
   Building2,
   MapPin,
+  Video,
 } from 'lucide-react';
 import { NotificationItem } from '@/types/app.types';
 import { createClient } from '@/lib/supabase/client';
@@ -120,6 +121,7 @@ export function TopBar() {
       case 'institute_admin':
         return [
           { href: '/dashboard', label: t('nav.dashboard', 'Dashboard'), icon: LayoutDashboard },
+          { href: '/online-classes', label: 'Online Zoom Classes', icon: Video },
           { href: '/classes', label: t('nav.classes', 'Classes & Batches'), icon: Users },
           { href: '/teachers', label: t('nav.teachers', 'Teachers & Faculty'), icon: Users },
           { href: '/students', label: t('nav.students', 'Student Records'), icon: Users },
@@ -134,6 +136,7 @@ export function TopBar() {
       case 'teacher':
         return [
           { href: '/dashboard', label: t('nav.dashboard', 'Today Schedule'), icon: LayoutDashboard },
+          { href: '/online-classes', label: 'Online Zoom Classes', icon: Video },
           { href: '/attendance', label: t('nav.attendance', 'Mark Attendance'), icon: CalendarCheck },
           { href: '/timetable', label: t('nav.timetable', 'My Timetable'), icon: Clock },
           { href: '/notes', label: t('nav.notes', 'Study Materials'), icon: BookOpen },
@@ -145,6 +148,7 @@ export function TopBar() {
       default:
         return [
           { href: '/dashboard', label: 'Home Dashboard', icon: LayoutDashboard },
+          { href: '/online-classes', label: 'Online Zoom Classes', icon: Video },
           { href: '/fees', label: t('nav.fees', 'Fee Payments & Receipts'), icon: CreditCard },
           { href: '/attendance', label: t('nav.attendance', 'Attendance Records'), icon: CalendarCheck },
           { href: '/timetable', label: t('nav.timetable', 'Class Timetable'), icon: Clock },

@@ -27,6 +27,8 @@ import {
   Zap,
   LayoutGrid,
   CloudUpload,
+  Video,
+  ExternalLink,
 } from 'lucide-react';
 import { useSupabaseData } from '@/lib/use-supabase-data';
 import { SchemaNotice } from '@/components/common/schema-notice';
@@ -170,6 +172,7 @@ export default function DashboardPage() {
     feeDues,
     payments,
     teachers,
+    onlineClasses,
     loading,
     schemaMissing,
   } = useSupabaseData(role === 'super_admin' ? null : instId);
@@ -343,6 +346,12 @@ export default function DashboardPage() {
       : '#001';
     const admDisplay = activeChild?.admission_number || 'ADM-9202';
 
+    const todayOnlineClass = (onlineClasses || []).find(
+      (oc) =>
+        (oc.status === 'live' || (oc.date === todayStr && oc.status === 'scheduled')) &&
+        (!activeChild?.class_id || oc.class_id === activeChild.class_id)
+    );
+
     const handleOpenDrawer = () => {
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('open-mobile-drawer'));
@@ -420,6 +429,42 @@ export default function DashboardPage() {
             </div>
           </div>
         </div>
+
+        {/* Live Online Zoom Class Alert (Shows when class is live or scheduled today) */}
+        {todayOnlineClass && (
+          <div className="bg-gradient-to-r from-rose-500 via-indigo-600 to-[#3739bf] text-white rounded-3xl p-4 shadow-md flex items-center justify-between gap-3 animate-in fade-in">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-10 h-10 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center shrink-0 border border-white/30 shadow-sm">
+                <Video className="w-5 h-5 text-white animate-pulse" />
+              </div>
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+                  <span className="text-[10px] font-black uppercase tracking-wider bg-white/20 px-2 py-0.5 rounded-full">
+                    {todayOnlineClass.status === 'live' ? 'Live Now' : 'Online Class Today'}
+                  </span>
+                </div>
+                <h4 className="text-xs sm:text-sm font-bold text-white truncate mt-0.5">
+                  {todayOnlineClass.title}
+                </h4>
+                <p className="text-[10px] text-indigo-100 truncate">
+                  {todayOnlineClass.start_time?.slice(0, 5)} - {todayOnlineClass.end_time?.slice(0, 5)} • {todayOnlineClass.teacher_name || 'Faculty'}
+                </p>
+              </div>
+            </div>
+
+            <a
+              href={todayOnlineClass.zoom_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="bg-white hover:bg-slate-100 active:scale-95 text-indigo-900 text-xs font-black px-4 py-2.5 rounded-2xl shadow-md transition-all shrink-0 flex items-center gap-1.5"
+            >
+              <Video className="w-3.5 h-3.5 text-rose-600" />
+              <span>Join Zoom</span>
+              <ExternalLink className="w-3 h-3 text-slate-400" />
+            </a>
+          </div>
+        )}
 
         {/* 2. Fee Due & Attendance Cards (2-Column Grid) */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
@@ -838,13 +883,22 @@ export default function DashboardPage() {
             </div>
             <span>Today&apos;s Schedule</span>
           </h3>
-          <Link
-            href="/timetable"
-            className="text-xs font-bold text-[#4338ca] hover:underline flex items-center gap-1 group"
-          >
-            <span>View Full Schedule</span>
-            <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
-          </Link>
+          <div className="flex items-center gap-3">
+            <Link
+              href="/online-classes"
+              className="text-xs font-bold text-rose-600 hover:underline flex items-center gap-1"
+            >
+              <Video className="w-3.5 h-3.5" />
+              <span>Live Zoom</span>
+            </Link>
+            <Link
+              href="/timetable"
+              className="text-xs font-bold text-[#4338ca] hover:underline flex items-center gap-1 group"
+            >
+              <span>View Full Schedule</span>
+              <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
+            </Link>
+          </div>
         </div>
 
         {todayScheduleSlots.length === 0 ? (

@@ -25,6 +25,7 @@ import {
   MarkRecord,
   UserProfile,
   NotificationItem,
+  OnlineClass,
 } from '@/types/app.types';
 
 export function useSupabaseData(instituteId?: string | null) {
@@ -46,6 +47,7 @@ export function useSupabaseData(instituteId?: string | null) {
   const [marks, setMarks] = useState<MarkRecord[]>([]);
   const [teachers, setTeachers] = useState<UserProfile[]>([]);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  const [onlineClasses, setOnlineClasses] = useState<OnlineClass[]>([]);
 
   const [loading, setLoading] = useState(true);
   const [schemaMissing, setSchemaMissing] = useState(false);
@@ -93,6 +95,7 @@ export function useSupabaseData(instituteId?: string | null) {
         setMarks(getLocalDataForInstitute<MarkRecord>('marks', instituteId));
         setTeachers(getLocalDataForInstitute<UserProfile>('teachers', instituteId));
         setNotifications(getLocalData<NotificationItem>('notifications'));
+        setOnlineClasses(getLocalDataForInstitute<OnlineClass>('onlineClasses', instituteId));
         setLoading(false);
         return;
       }
@@ -348,6 +351,25 @@ export function useSupabaseData(instituteId?: string | null) {
       } catch {
         setNotifications(getLocalData<NotificationItem>('notifications'));
       }
+
+      // 16. Fetch Online Classes (Zoom)
+      try {
+        let ocQuery = (supabase as any)
+          .from('online_classes')
+          .select('*')
+          .order('date', { ascending: false });
+        if (instituteId) {
+          ocQuery = ocQuery.eq('institute_id', instituteId);
+        }
+        const { data: ocData } = await ocQuery;
+        if (ocData && ocData.length > 0) {
+          setOnlineClasses(syncLocalWithRemote('onlineClasses', ocData as OnlineClass[]));
+        } else {
+          setOnlineClasses(getLocalDataForInstitute<OnlineClass>('onlineClasses', instituteId));
+        }
+      } catch {
+        setOnlineClasses(getLocalDataForInstitute<OnlineClass>('onlineClasses', instituteId));
+      }
     } catch (err) {
       console.warn('Supabase data query fallback:', err);
     } finally {
@@ -392,6 +414,8 @@ export function useSupabaseData(instituteId?: string | null) {
     setTeachers,
     notifications,
     setNotifications,
+    onlineClasses,
+    setOnlineClasses,
     loading,
     schemaMissing,
     refetch: fetchData,

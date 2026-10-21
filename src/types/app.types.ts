@@ -36,6 +36,26 @@ export interface StudentWithClass extends Student {
   section?: string;
 }
 
+export interface OnlineClass {
+  id: string;
+  institute_id: string;
+  class_id: string;
+  subject_id: string;
+  teacher_id: string | null;
+  teacher_name?: string;
+  title: string;
+  description?: string | null;
+  date: string;
+  start_time: string;
+  end_time: string;
+  zoom_url: string;
+  meeting_id?: string | null;
+  passcode?: string | null;
+  status: 'scheduled' | 'live' | 'completed' | 'cancelled';
+  created_at: string;
+  updated_at?: string;
+}
+
 export interface AttendanceRowItem {
   student: Student;
   status: AttendanceStatus;
