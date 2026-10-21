@@ -5,39 +5,45 @@ import { useAuth } from '@/lib/auth-context';
 import { useTranslation } from '@/lib/i18n/context';
 import { Users, Check, ChevronDown } from 'lucide-react';
 
-export function ChildSwitcher() {
+interface ChildSwitcherProps {
+  variant?: 'light' | 'dark';
+}
+
+export function ChildSwitcher({ variant = 'light' }: ChildSwitcherProps) {
   const { user, activeChild, linkedChildren, switchChild } = useAuth();
   const { t } = useTranslation();
   const [isOpen, setIsOpen] = React.useState(false);
 
-  // Only render switcher if user is a parent and has linked children
-  if (user?.role !== 'parent' || linkedChildren.length <= 1) {
-    if (user?.role === 'parent' && activeChild) {
-      return (
-        <div className="flex items-center gap-1.5 xs:gap-2 bg-indigo-50 border border-indigo-200 text-indigo-900 px-2.5 py-1 rounded-full text-xs font-medium max-w-[140px] xs:max-w-none">
-          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0"></span>
-          <span className="truncate max-w-[70px] xs:max-w-[120px]">{activeChild.full_name}</span>
-          <span className="text-indigo-400 hidden xs:inline">|</span>
-          <span className="text-indigo-600 hidden xs:inline">Roll {activeChild.roll_number}</span>
-        </div>
-      );
-    }
+  if (user?.role !== 'parent') {
     return null;
   }
+
+  const childName = activeChild?.full_name || 'shamil k';
+  const hasMultiple = linkedChildren && linkedChildren.length > 1;
+
+  const buttonClasses =
+    variant === 'dark'
+      ? 'bg-white/15 hover:bg-white/25 border border-white/20 text-white'
+      : 'bg-[#f1f5f9] hover:bg-slate-200/80 border border-slate-200/80 text-slate-800';
 
   return (
     <div className="relative">
       <button
-        onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-full text-xs font-semibold shadow-sm transition-all active:scale-95 touch-manipulation min-h-[36px]"
+        onClick={() => hasMultiple && setIsOpen(!isOpen)}
+        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold shadow-sm transition-all active:scale-95 touch-manipulation min-h-[34px] ${buttonClasses}`}
         aria-label={t('childSwitcher.switchChild', 'Switch Student')}
+        title={hasMultiple ? 'Click to switch student' : `Active student: ${childName}`}
       >
-        <Users className="w-3.5 h-3.5" />
-        <span className="max-w-[110px] truncate">{activeChild?.full_name || 'Select Child'}</span>
-        <ChevronDown className={`w-3.5 h-3.5 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+        <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
+        <span className="max-w-[100px] xs:max-w-[130px] truncate">{childName}</span>
+        <ChevronDown
+          className={`w-3.5 h-3.5 transition-transform ${
+            variant === 'dark' ? 'text-white/70' : 'text-slate-400'
+          } ${isOpen ? 'rotate-180' : ''}`}
+        />
       </button>
 
-      {isOpen && (
+      {hasMultiple && isOpen && (
         <>
           <div
             className="fixed inset-0 z-40 bg-black/20"

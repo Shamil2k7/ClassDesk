@@ -28,6 +28,7 @@ import {
   CreditCard,
   LayoutDashboard,
   Building2,
+  MapPin,
 } from 'lucide-react';
 import { NotificationItem } from '@/types/app.types';
 import { createClient } from '@/lib/supabase/client';
@@ -161,17 +162,29 @@ export function TopBar() {
     ? `${institute.city}, ${institute.state || 'Kerala'} | ${institute.state || 'Kerala'}`
     : 'Perinthalmanna, Kerala | Kerala';
 
+  const isStudentView = role === 'parent';
+
   return (
     <>
-      {/* Curved Royal Blue Header Banner (Matches User Design Screenshot) */}
-      <header className="sticky top-0 z-30 bg-gradient-to-r from-[#3233a8] via-[#3839b8] to-[#4338ca] text-white rounded-b-[24px] sm:rounded-b-[28px] shadow-lg shadow-indigo-950/15 px-3 sm:px-6 py-3 sm:py-3.5 transition-all">
+      {/* Header Banner - Adaptive for Student / Parent vs Admin */}
+      <header
+        className={`sticky top-0 z-30 transition-all ${
+          isStudentView
+            ? 'bg-white border-b border-slate-100 shadow-[0_1px_3px_rgba(0,0,0,0.03)] text-slate-800 px-3 sm:px-6 py-2.5 sm:py-3'
+            : 'bg-gradient-to-r from-[#3233a8] via-[#3839b8] to-[#4338ca] text-white rounded-b-[24px] sm:rounded-b-[28px] shadow-lg shadow-indigo-950/15 px-3 sm:px-6 py-3 sm:py-3.5'
+        }`}
+      >
         <div className="max-w-7xl mx-auto flex items-center justify-between gap-2 sm:gap-4">
           {/* Left: Mobile Menu Trigger + Branding & Institute Details */}
           <div className="flex items-center gap-2 sm:gap-3 min-w-0">
             {pathname !== '/login' && (
               <button
                 onClick={() => setMobileNavOpen(true)}
-                className="p-1.5 -ml-1 text-white/90 hover:text-white hover:bg-white/15 rounded-xl transition-colors shrink-0 sm:hidden"
+                className={`p-1.5 -ml-1 rounded-xl transition-colors shrink-0 sm:hidden ${
+                  isStudentView
+                    ? 'text-slate-700 hover:text-slate-900 hover:bg-slate-100'
+                    : 'text-white/90 hover:text-white hover:bg-white/15'
+                }`}
                 aria-label="Open Navigation Menu"
               >
                 <Menu className="w-5 h-5" />
@@ -182,17 +195,32 @@ export function TopBar() {
               href={user?.role === 'super_admin' ? '/super-admin' : '/dashboard'}
               className="flex items-center gap-2.5 min-w-0 hover:opacity-95 transition-opacity"
             >
-              {/* Badge Icon (Square with rounded corners, matching screenshot) */}
-              <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-white/20 backdrop-blur-md border border-white/25 flex items-center justify-center text-white shrink-0 shadow-sm">
+              {/* Badge Icon */}
+              <div
+                className={`w-9 h-9 sm:w-10 sm:h-10 rounded-2xl flex items-center justify-center shrink-0 shadow-sm ${
+                  isStudentView
+                    ? 'bg-[#3739bf] text-white'
+                    : 'bg-white/20 backdrop-blur-md border border-white/25 text-white'
+                }`}
+              >
                 <GraduationCap className="w-5 h-5 text-white" />
               </div>
 
               <div className="min-w-0">
-                <h1 className="text-xs sm:text-sm font-extrabold text-white tracking-wider uppercase truncate leading-tight">
+                <h1
+                  className={`text-xs sm:text-sm font-extrabold tracking-wider uppercase truncate leading-tight ${
+                    isStudentView ? 'text-slate-900' : 'text-white'
+                  }`}
+                >
                   {instituteDisplayName}
                 </h1>
-                <p className="text-[10px] text-indigo-200/90 truncate leading-tight mt-0.5">
-                  {instituteSubtitle}
+                <p
+                  className={`text-[10px] truncate leading-tight mt-0.5 flex items-center gap-1 ${
+                    isStudentView ? 'text-slate-400 font-medium' : 'text-indigo-200/90'
+                  }`}
+                >
+                  {isStudentView && <MapPin className="w-3 h-3 text-slate-400 shrink-0 inline" />}
+                  <span>{instituteSubtitle}</span>
                 </p>
               </div>
             </Link>
@@ -203,15 +231,19 @@ export function TopBar() {
             {pathname !== '/login' && (
               <>
                 {/* Child Switcher if parent */}
-                <ChildSwitcher />
+                <ChildSwitcher variant={isStudentView ? 'light' : 'dark'} />
 
                 {/* Install App Link */}
                 <Link
                   href="/install"
-                  className="hidden md:flex items-center gap-1.5 bg-white/15 hover:bg-white/25 border border-white/20 text-white px-2.5 py-1.5 rounded-full text-[11px] font-bold transition-all active:scale-95"
+                  className={`hidden md:flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-[11px] font-bold transition-all active:scale-95 ${
+                    isStudentView
+                      ? 'bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200'
+                      : 'bg-white/15 hover:bg-white/25 border border-white/20 text-white'
+                  }`}
                   title="Install Mobile App"
                 >
-                  <Smartphone className="w-3.5 h-3.5 text-white" />
+                  <Smartphone className="w-3.5 h-3.5" />
                   <span>Install App</span>
                 </Link>
               </>
@@ -221,11 +253,15 @@ export function TopBar() {
             <div className="relative">
               <button
                 onClick={() => setShowLangMenu(!showLangMenu)}
-                className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-white/15 hover:bg-white/25 text-white flex items-center justify-center transition-colors"
+                className={`w-8 h-8 sm:w-9 sm:h-9 rounded-full flex items-center justify-center transition-colors ${
+                  isStudentView
+                    ? 'bg-slate-100 hover:bg-slate-200 text-slate-600'
+                    : 'bg-white/15 hover:bg-white/25 text-white'
+                }`}
                 title="Change Language"
                 aria-label="Change Language"
               >
-                <Globe className="w-4 h-4 text-white" />
+                <Globe className="w-4 h-4" />
               </button>
 
               {showLangMenu && (
@@ -257,20 +293,24 @@ export function TopBar() {
               )}
             </div>
 
-            {/* Notification Bell with Red Dot (Matches Screenshot) */}
+            {/* Notification Bell with Red Dot */}
             {pathname !== '/login' && (
               <div className="relative">
                 <button
                   onClick={() => setShowNotifMenu(!showNotifMenu)}
-                  className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-white/15 hover:bg-white/25 text-white flex items-center justify-center transition-colors relative"
+                  className={`w-8 h-8 sm:w-9 sm:h-9 rounded-full flex items-center justify-center transition-colors relative ${
+                    isStudentView
+                      ? 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                      : 'bg-white/15 hover:bg-white/25 text-white'
+                  }`}
                   aria-label="Notifications"
                 >
-                  <Bell className="w-4 h-4 text-white" />
-                  {unreadCount > 0 ? (
-                    <span className="absolute top-2 right-2 w-2 h-2 bg-rose-500 rounded-full ring-2 ring-[#3839b8]"></span>
-                  ) : (
-                    <span className="absolute top-2 right-2 w-2 h-2 bg-rose-500 rounded-full ring-2 ring-[#3839b8]"></span>
-                  )}
+                  <Bell className="w-4 h-4" />
+                  <span
+                    className={`absolute top-1.5 right-1.5 w-2 h-2 bg-rose-500 rounded-full ${
+                      isStudentView ? 'ring-2 ring-white' : 'ring-2 ring-[#3839b8]'
+                    }`}
+                  />
                 </button>
 
                 {showNotifMenu && (
@@ -316,16 +356,24 @@ export function TopBar() {
               </div>
             )}
 
-            {/* Profile Avatar / User Icon (Matches Screenshot Circle Button) */}
+            {/* Profile Avatar / User Icon */}
             {pathname !== '/login' && user && (
               <div className="relative">
                 <button
                   onClick={() => setShowProfileMenu(!showProfileMenu)}
-                  className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-white/15 hover:bg-white/25 border border-white/20 text-white flex items-center justify-center transition-all focus:outline-none focus:ring-2 focus:ring-white/40"
+                  className={`w-8 h-8 sm:w-9 sm:h-9 rounded-full flex items-center justify-center transition-all focus:outline-none focus:ring-2 shadow-sm ${
+                    isStudentView
+                      ? 'bg-[#4338ca] text-white font-bold text-xs hover:opacity-90 focus:ring-indigo-300'
+                      : 'bg-white/15 hover:bg-white/25 border border-white/20 text-white focus:ring-white/40'
+                  }`}
                   aria-label="My Profile & Account"
                   title="My Profile & Account"
                 >
-                  <User className="w-4 h-4 text-white" />
+                  {isStudentView ? (
+                    <span>{user.full_name?.slice(0, 1).toUpperCase() || 'R'}</span>
+                  ) : (
+                    <User className="w-4 h-4 text-white" />
+                  )}
                 </button>
 
                 {/* Profile Dropdown Modal */}

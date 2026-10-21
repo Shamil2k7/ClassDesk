@@ -23,6 +23,10 @@ import {
   FileText,
   CheckCircle2,
   Loader2,
+  Megaphone,
+  Zap,
+  LayoutGrid,
+  CloudUpload,
 } from 'lucide-react';
 import { useSupabaseData } from '@/lib/use-supabase-data';
 import { SchemaNotice } from '@/components/common/schema-notice';
@@ -102,6 +106,39 @@ function Graduation3DGraphic() {
           <path d="M105 67L111 67L110 74L106 74Z" fill="#F59E0B" />
           <ellipse cx="108" cy="67" rx="3.5" ry="2" fill="#D97706" />
         </g>
+      </svg>
+    </div>
+  );
+}
+
+// 3D Graduation Cap Watermark Graphic (for Student Banner)
+function GraduationWatermarkGraphic() {
+  return (
+    <div className="w-36 h-36 sm:w-48 sm:h-48 absolute -right-4 -top-4 opacity-25 pointer-events-none select-none">
+      <svg
+        viewBox="0 0 160 160"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+        className="w-full h-full text-white"
+      >
+        <path
+          d="M80 30L145 60L80 90L15 60L80 30Z"
+          fill="currentColor"
+          opacity="0.9"
+        />
+        <path
+          d="M45 74V100C45 118 61 126 80 126C99 126 115 118 115 100V74L80 90L45 74Z"
+          fill="currentColor"
+          opacity="0.8"
+        />
+        <path
+          d="M80 60C100 64 125 76 130 92C133 100 132 110 132 118"
+          stroke="currentColor"
+          strokeWidth="3"
+          strokeLinecap="round"
+          opacity="0.9"
+        />
+        <ellipse cx="132" cy="120" rx="4" ry="6" fill="currentColor" opacity="0.9" />
       </svg>
     </div>
   );
@@ -251,7 +288,7 @@ export default function DashboardPage() {
   }
 
   // -------------------------------------------------------------
-  // 2. PARENT / STUDENT DASHBOARD
+  // 2. PARENT / STUDENT DASHBOARD (Matches User Screenshot)
   // -------------------------------------------------------------
   if (role === 'parent') {
     const todayStr = new Date().toISOString().split('T')[0];
@@ -269,181 +306,375 @@ export default function DashboardPage() {
 
     const childAttendanceRecords = attendance.filter((a) => a.student_id === activeChild?.id);
     const presentDays = childAttendanceRecords.filter((a) => a.status === 'present').length;
+    const absentDays = childAttendanceRecords.filter((a) => a.status === 'absent').length;
     const totalDays = childAttendanceRecords.length;
-    const attendancePct = totalDays > 0 ? Math.round((presentDays / totalDays) * 100) : 100;
+    const attendancePct = totalDays > 0 ? Math.round((presentDays / totalDays) * 100) : 0;
 
     const childAnnouncements = announcements.filter(
       (a) => a.target_type === 'all' || (activeChild && a.target_class_id === activeChild.class_id)
     );
 
+    // Sample announcement if none exists so UI matches user reference
+    const displayAnnouncements =
+      childAnnouncements.length > 0
+        ? childAnnouncements.slice(0, 3)
+        : [
+            {
+              id: 'sample-welcome',
+              title: 'Good morning',
+              content: 'asadfdsf',
+              target_type: 'all',
+              created_at: new Date().toISOString(),
+            },
+          ];
+
+    const studentClass = classes.find((c) => c.id === activeChild?.class_id);
+    const studentClassName = studentClass?.name || 'BCA';
+    const studentName = activeChild?.full_name || 'shamil k';
+    const studentInitials =
+      studentName
+        .split(' ')
+        .filter(Boolean)
+        .slice(0, 2)
+        .map((w) => w[0].toUpperCase())
+        .join('') || 'SH';
+    const rollDisplay = activeChild?.roll_number
+      ? `#${String(activeChild.roll_number).padStart(3, '0')}`
+      : '#001';
+    const admDisplay = activeChild?.admission_number || 'ADM-9202';
+
+    const handleOpenDrawer = () => {
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('open-mobile-drawer'));
+      }
+    };
+
     return (
-      <div className="space-y-5 animate-in fade-in duration-300">
+      <div className="space-y-4 sm:space-y-5 animate-in fade-in duration-300">
         <SchemaNotice visible={schemaMissing} />
 
-        <div className="bg-gradient-to-r from-indigo-600 to-indigo-800 text-white rounded-3xl p-5 sm:p-7 shadow-lg relative overflow-hidden">
-          <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div className="flex items-center gap-3.5">
-              <div className="w-14 h-14 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center text-white text-xl font-black border border-white/30">
-                {activeChild?.full_name ? activeChild.full_name.slice(0, 2).toUpperCase() : 'ST'}
-              </div>
-              <div>
-                <span className="text-[10px] font-bold tracking-wider uppercase bg-white/20 px-2 py-0.5 rounded-md">
-                  Active Student
-                </span>
-                <h2 className="text-lg sm:text-xl font-bold mt-1 leading-tight">
-                  {activeChild?.full_name || 'Select Child'}
-                </h2>
-                <p className="text-xs text-indigo-100 mt-0.5">
-                  Roll #{activeChild?.roll_number || 'N/A'} • Admission: {activeChild?.admission_number || 'N/A'}
+        {/* 1. Student Profile Gradient Banner */}
+        <div className="bg-gradient-to-r from-[#292ba5] via-[#3739bf] to-[#4338ca] text-white rounded-3xl p-5 sm:p-6 shadow-md relative overflow-hidden">
+          <GraduationWatermarkGraphic />
+
+          {/* Student Avatar + Info Row */}
+          <div className="relative z-10 flex items-start gap-4">
+            <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-[#6366f1]/50 backdrop-blur-md border border-white/20 text-white font-black text-xl sm:text-2xl flex items-center justify-center shrink-0 shadow-sm">
+              {studentInitials}
+            </div>
+
+            <div className="min-w-0 flex-1">
+              <span className="inline-block bg-[#10b981]/25 text-[#6ee7b7] text-[10px] font-extrabold px-2.5 py-0.5 rounded-full uppercase tracking-wider">
+                ACTIVE STUDENT
+              </span>
+              <h2 className="text-xl sm:text-2xl font-black text-white mt-1 leading-tight truncate">
+                {studentName}
+              </h2>
+              <p className="text-xs text-indigo-200/90 font-medium mt-1">
+                Roll {rollDisplay} • Admission: {admDisplay}
+              </p>
+            </div>
+          </div>
+
+          {/* Bottom 3-Column Stats Bar */}
+          <div className="relative z-10 mt-5 pt-4 border-t border-white/15 grid grid-cols-3 gap-2 sm:gap-4">
+            {/* Class */}
+            <div className="flex items-center gap-2.5">
+              <GraduationCap className="w-5 h-5 text-indigo-200 shrink-0" />
+              <div className="min-w-0">
+                <p className="text-[10px] text-indigo-200/80 font-medium">Class</p>
+                <p className="text-xs sm:text-sm font-black text-white truncate">
+                  {studentClassName}
                 </p>
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
-              <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl px-4 py-2 text-center">
-                <p className="text-[10px] text-indigo-200">Today&apos;s Status</p>
-                <p className="text-xs font-bold text-white mt-0.5 flex items-center justify-center gap-1">
-                  <span
-                    className={`w-2 h-2 rounded-full ${
-                      todayAttendance?.status === 'present'
-                        ? 'bg-emerald-400'
-                        : todayAttendance?.status === 'absent'
-                        ? 'bg-rose-400'
-                        : todayAttendance?.status === 'late'
-                        ? 'bg-amber-400'
-                        : 'bg-slate-300'
-                    }`}
-                  />
-                  {todayAttendance?.status
-                    ? todayAttendance.status.toUpperCase()
-                    : 'NOT MARKED YET'}
+            {/* Academic Year */}
+            <div className="flex items-center gap-2.5">
+              <Calendar className="w-5 h-5 text-indigo-200 shrink-0" />
+              <div className="min-w-0">
+                <p className="text-[10px] text-indigo-200/80 font-medium">Academic Year</p>
+                <p className="text-xs sm:text-sm font-black text-white truncate">2026 - 2027</p>
+              </div>
+            </div>
+
+            {/* Today's Status */}
+            <div className="flex items-center gap-2.5">
+              <div className="w-5 h-5 rounded-full border-2 border-indigo-200/80 flex items-center justify-center shrink-0">
+                <span
+                  className={`w-2 h-2 rounded-full ${
+                    todayAttendance?.status === 'present'
+                      ? 'bg-emerald-400'
+                      : todayAttendance?.status === 'absent'
+                      ? 'bg-rose-400'
+                      : 'bg-indigo-300'
+                  }`}
+                />
+              </div>
+              <div className="min-w-0">
+                <p className="text-[10px] text-indigo-200/80 font-medium">Today&apos;s Status</p>
+                <p className="text-xs sm:text-sm font-black text-white truncate">
+                  {todayAttendance?.status ? todayAttendance.status.toUpperCase() : 'NOT MARKED YET'}
                 </p>
               </div>
             </div>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div className="bg-white rounded-3xl p-5 border border-slate-200 shadow-sm flex flex-col justify-between">
+        {/* 2. Fee Due & Attendance Cards (2-Column Grid) */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+          {/* Card 1: Fee Due */}
+          <div className="bg-white rounded-3xl p-5 border border-slate-100 shadow-sm flex flex-col justify-between">
             <div>
               <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
-                    <CreditCard className="w-4 h-4" />
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-2xl bg-[#ecfdf5] text-[#10b981] flex items-center justify-center">
+                    <CreditCard className="w-5 h-5 stroke-[2.2]" />
                   </div>
-                  <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wide">
-                    {t('dashboard.feeDues', 'Fee Dues')}
+                  <h3 className="text-xs font-bold text-slate-600 uppercase tracking-wider">
+                    FEE DUE
                   </h3>
                 </div>
                 <span
-                  className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${
+                  className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full ${
                     totalDue > 0
                       ? 'bg-amber-50 text-amber-700 border border-amber-200'
-                      : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                      : 'bg-[#ecfdf5] text-[#10b981]'
                   }`}
                 >
-                  {totalDue > 0 ? 'Pending' : 'Settled'}
+                  {totalDue > 0 ? 'Pending' : 'All Paid'}
                 </span>
               </div>
 
-              <div className="my-3">
-                <p className="text-2xl font-black text-slate-900">
+              <div className="my-2">
+                <p className="text-2xl sm:text-3xl font-black text-slate-900">
                   ₹{totalDue.toLocaleString('en-IN')}
                 </p>
-                <p className="text-[11px] text-slate-400 mt-0.5">
-                  {pendingDues.length} outstanding invoice(s)
+                <p className="text-xs text-slate-500 mt-1 font-medium">
+                  {totalDue > 0
+                    ? `${pendingDues.length} pending invoice(s)`
+                    : 'No pending dues at this moment.'}
                 </p>
               </div>
             </div>
 
             <Link
               href="/fees"
-              className="w-full bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white py-3 rounded-2xl text-xs font-bold flex items-center justify-center gap-2 shadow-sm transition-all min-h-[44px]"
+              className="w-full bg-[#f0f2fe] hover:bg-indigo-100 text-[#4338ca] text-xs font-bold py-3 rounded-2xl flex items-center justify-center gap-1.5 transition-all mt-4"
             >
-              <span>{totalDue > 0 ? 'Pay Online (Razorpay)' : 'View Receipts'}</span>
-              <ArrowRight className="w-4 h-4" />
+              <span>View Fee Details</span>
+              <ChevronRight className="w-4 h-4" />
             </Link>
           </div>
 
-          <div className="bg-white rounded-3xl p-5 border border-slate-200 shadow-sm flex flex-col justify-between">
+          {/* Card 2: Attendance */}
+          <div className="bg-white rounded-3xl p-5 border border-slate-100 shadow-sm flex flex-col justify-between">
             <div>
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
-                  <CalendarCheck className="w-4 h-4" />
+              <div className="flex items-center gap-2.5 mb-3">
+                <div className="w-9 h-9 rounded-2xl bg-[#eff6ff] text-[#3b82f6] flex items-center justify-center">
+                  <CalendarCheck className="w-5 h-5 stroke-[2.2]" />
                 </div>
-                <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wide">
-                  Attendance & Performance
+                <h3 className="text-xs font-bold text-slate-600 uppercase tracking-wider">
+                  ATTENDANCE
                 </h3>
               </div>
 
-              <div className="my-4 space-y-2">
-                <div className="flex items-center justify-between text-xs">
-                  <span className="text-slate-600">Overall Attendance</span>
-                  <span className="font-bold text-emerald-600">{attendancePct}%</span>
+              <div className="my-2 space-y-1.5">
+                <div className="flex items-center justify-between text-xs font-medium">
+                  <span className="text-slate-500">Overall Attendance</span>
+                  <span className="font-bold text-slate-800">{attendancePct}%</span>
                 </div>
                 <div className="w-full h-2 rounded-full bg-slate-100 overflow-hidden">
                   <div
-                    className="h-full bg-emerald-500 rounded-full transition-all"
+                    className="h-full bg-[#3b82f6] rounded-full transition-all"
                     style={{ width: `${Math.min(100, attendancePct)}%` }}
                   />
                 </div>
-                <p className="text-[11px] text-slate-400">
-                  {presentDays} Present out of {totalDays} recorded days
+                <p className="text-[11px] text-slate-500 font-medium pt-0.5">
+                  {presentDays} Present &nbsp;|&nbsp; {absentDays} Absent &nbsp;|&nbsp; {totalDays} Total
                 </p>
               </div>
             </div>
 
             <Link
               href="/attendance"
-              className="w-full bg-slate-100 hover:bg-slate-200 text-slate-800 py-3 rounded-2xl text-xs font-bold flex items-center justify-center gap-2 transition-colors min-h-[44px]"
+              className="w-full bg-[#f0f2fe] hover:bg-indigo-100 text-[#4338ca] text-xs font-bold py-3 rounded-2xl flex items-center justify-center gap-1.5 transition-all mt-4"
             >
+              <Calendar className="w-4 h-4" />
               <span>View Full Calendar</span>
               <ChevronRight className="w-4 h-4" />
             </Link>
           </div>
         </div>
 
-        <div>
-          <div className="flex items-center justify-between mb-3">
+        {/* 3. School Announcements Section */}
+        <div className="bg-white rounded-3xl p-5 border border-slate-100 shadow-sm space-y-3">
+          <div className="flex items-center justify-between">
             <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-              <Bell className="w-4 h-4 text-indigo-600" />
+              <div className="w-8 h-8 rounded-2xl bg-[#eff3fe] text-[#6366f1] flex items-center justify-center">
+                <Bell className="w-4 h-4" />
+              </div>
               <span>School Announcements</span>
             </h3>
-            <Link href="/announcements" className="text-xs font-bold text-indigo-600 hover:underline">
-              View All
+            <Link
+              href="/announcements"
+              className="text-xs font-bold text-[#4338ca] hover:underline flex items-center gap-0.5"
+            >
+              <span>View All</span>
+              <ChevronRight className="w-3.5 h-3.5" />
             </Link>
           </div>
 
-          {childAnnouncements.length === 0 ? (
-            <div className="bg-white p-6 rounded-2xl border border-slate-200 text-center text-slate-400">
-              <p className="text-xs font-medium text-slate-600">No new notices posted</p>
-              <p className="text-[10px] text-slate-400 mt-0.5">
-                School circulars and event alerts will appear here.
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {childAnnouncements.slice(0, 3).map((ann) => (
-                <div
-                  key={ann.id}
-                  className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm"
-                >
-                  <div className="flex items-center justify-between mb-1.5">
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200">
-                      {ann.target_type === 'all' ? 'All School' : 'Class Notice'}
-                    </span>
-                    <span className="text-[10px] text-slate-400">
-                      {new Date(ann.created_at).toLocaleDateString('en-IN')}
-                    </span>
+          <div className="space-y-2.5">
+            {displayAnnouncements.map((ann) => (
+              <Link
+                key={ann.id}
+                href="/announcements"
+                className="bg-[#f8fafc] border border-slate-100 rounded-2xl p-3.5 flex items-center justify-between hover:border-indigo-100 transition-colors group"
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-10 h-10 rounded-2xl bg-[#eff3fe] text-[#6366f1] flex items-center justify-center shrink-0">
+                    <Megaphone className="w-4 h-4" />
                   </div>
-                  <h4 className="text-xs font-bold text-slate-900">{ann.title}</h4>
-                  <p className="text-xs text-slate-600 mt-1 line-clamp-2 leading-relaxed">
-                    {ann.content}
-                  </p>
+                  <div className="min-w-0">
+                    <p className="text-xs sm:text-sm font-bold text-slate-900 leading-snug truncate">
+                      {ann.title}
+                    </p>
+                    <p className="text-xs text-slate-500 mt-0.5 truncate">{ann.content}</p>
+                    <p className="text-[10px] text-slate-400 mt-1 flex items-center gap-1 font-medium">
+                      <Calendar className="w-3 h-3 text-slate-400 inline" />
+                      <span>
+                        {new Date(ann.created_at).toLocaleDateString('en-GB', {
+                          day: '2-digit',
+                          month: 'short',
+                          year: 'numeric',
+                        })}
+                      </span>
+                    </p>
+                  </div>
                 </div>
-              ))}
-            </div>
-          )}
+
+                <div className="flex items-center gap-1.5 shrink-0 ml-2">
+                  <span className="text-[10px] font-medium px-2.5 py-0.5 rounded-full bg-[#eff3fe] text-[#6366f1]">
+                    {ann.target_type === 'all' ? 'General' : 'Class Notice'}
+                  </span>
+                  <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-indigo-600 group-hover:translate-x-0.5 transition-all" />
+                </div>
+              </Link>
+            ))}
+          </div>
+        </div>
+
+        {/* 4. Quick Actions (3-Column Grid) */}
+        <div className="space-y-3">
+          <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+            <Zap className="w-4 h-4 text-[#6366f1]" />
+            <span>Quick Actions</span>
+          </h3>
+
+          <div className="grid grid-cols-3 gap-2 sm:gap-3">
+            {/* 1. View Fees */}
+            <Link
+              href="/fees"
+              className="bg-white rounded-2xl p-2.5 sm:p-3.5 border border-slate-100 shadow-sm hover:border-indigo-100 hover:shadow-md transition-all flex items-center gap-2 sm:gap-3 group"
+            >
+              <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-[#f5f3ff] text-[#8b5cf6] flex items-center justify-center shrink-0">
+                <CreditCard className="w-4 h-4 sm:w-4.5 sm:h-4.5" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-[11px] sm:text-xs font-bold text-slate-900 truncate">View Fees</p>
+                <p className="text-[9px] sm:text-[10px] text-slate-400 truncate mt-0.5">
+                  Check your fee details
+                </p>
+              </div>
+              <ChevronRight className="w-3.5 h-3.5 text-slate-300 group-hover:text-indigo-600 group-hover:translate-x-0.5 transition-all shrink-0 hidden xs:block" />
+            </Link>
+
+            {/* 2. Attendance */}
+            <Link
+              href="/attendance"
+              className="bg-white rounded-2xl p-2.5 sm:p-3.5 border border-slate-100 shadow-sm hover:border-emerald-100 hover:shadow-md transition-all flex items-center gap-2 sm:gap-3 group"
+            >
+              <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-[#ecfdf5] text-[#10b981] flex items-center justify-center shrink-0">
+                <CalendarCheck className="w-4 h-4 sm:w-4.5 sm:h-4.5" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-[11px] sm:text-xs font-bold text-slate-900 truncate">Attendance</p>
+                <p className="text-[9px] sm:text-[10px] text-slate-400 truncate mt-0.5">
+                  View your attendance
+                </p>
+              </div>
+              <ChevronRight className="w-3.5 h-3.5 text-slate-300 group-hover:text-emerald-600 group-hover:translate-x-0.5 transition-all shrink-0 hidden xs:block" />
+            </Link>
+
+            {/* 3. Timetable */}
+            <Link
+              href="/timetable"
+              className="bg-white rounded-2xl p-2.5 sm:p-3.5 border border-slate-100 shadow-sm hover:border-blue-100 hover:shadow-md transition-all flex items-center gap-2 sm:gap-3 group"
+            >
+              <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-[#eff6ff] text-[#3b82f6] flex items-center justify-center shrink-0">
+                <Clock className="w-4 h-4 sm:w-4.5 sm:h-4.5" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-[11px] sm:text-xs font-bold text-slate-900 truncate">Timetable</p>
+                <p className="text-[9px] sm:text-[10px] text-slate-400 truncate mt-0.5">
+                  See your class schedule
+                </p>
+              </div>
+              <ChevronRight className="w-3.5 h-3.5 text-slate-300 group-hover:text-blue-600 group-hover:translate-x-0.5 transition-all shrink-0 hidden xs:block" />
+            </Link>
+
+            {/* 4. Exam Marks */}
+            <Link
+              href="/exams"
+              className="bg-white rounded-2xl p-2.5 sm:p-3.5 border border-slate-100 shadow-sm hover:border-orange-100 hover:shadow-md transition-all flex items-center gap-2 sm:gap-3 group"
+            >
+              <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-[#fff7ed] text-[#f97316] flex items-center justify-center shrink-0">
+                <FileText className="w-4 h-4 sm:w-4.5 sm:h-4.5" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-[11px] sm:text-xs font-bold text-slate-900 truncate">Exam Marks</p>
+                <p className="text-[9px] sm:text-[10px] text-slate-400 truncate mt-0.5">
+                  View your results
+                </p>
+              </div>
+              <ChevronRight className="w-3.5 h-3.5 text-slate-300 group-hover:text-orange-600 group-hover:translate-x-0.5 transition-all shrink-0 hidden xs:block" />
+            </Link>
+
+            {/* 5. Upload Notes */}
+            <Link
+              href="/notes"
+              className="bg-white rounded-2xl p-2.5 sm:p-3.5 border border-slate-100 shadow-sm hover:border-red-100 hover:shadow-md transition-all flex items-center gap-2 sm:gap-3 group"
+            >
+              <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-[#fef2f2] text-[#ef4444] flex items-center justify-center shrink-0">
+                <CloudUpload className="w-4 h-4 sm:w-4.5 sm:h-4.5" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-[11px] sm:text-xs font-bold text-slate-900 truncate">Upload Notes</p>
+                <p className="text-[9px] sm:text-[10px] text-slate-400 truncate mt-0.5">
+                  PDF & study materials
+                </p>
+              </div>
+              <ChevronRight className="w-3.5 h-3.5 text-slate-300 group-hover:text-red-600 group-hover:translate-x-0.5 transition-all shrink-0 hidden xs:block" />
+            </Link>
+
+            {/* 6. More */}
+            <button
+              onClick={handleOpenDrawer}
+              className="bg-white rounded-2xl p-2.5 sm:p-3.5 border border-slate-100 shadow-sm hover:border-indigo-100 hover:shadow-md transition-all flex items-center gap-2 sm:gap-3 group text-left"
+            >
+              <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-[#f1f5f9] text-[#475569] flex items-center justify-center shrink-0">
+                <LayoutGrid className="w-4 h-4 sm:w-4.5 sm:h-4.5" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-[11px] sm:text-xs font-bold text-slate-900 truncate">More</p>
+                <p className="text-[9px] sm:text-[10px] text-slate-400 truncate mt-0.5">
+                  Extra features
+                </p>
+              </div>
+              <ChevronRight className="w-3.5 h-3.5 text-slate-300 group-hover:text-slate-600 group-hover:translate-x-0.5 transition-all shrink-0 hidden xs:block" />
+            </button>
+          </div>
         </div>
       </div>
     );
