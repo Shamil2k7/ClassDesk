@@ -17,10 +17,106 @@ import {
   Users,
   Plus,
   Loader2,
+  ChevronLeft,
+  ChevronRight,
+  Calendar,
+  CalendarDays,
+  Grid,
+  List,
+  Info,
+  XCircle,
+  Sparkles,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { SchemaNotice } from '@/components/common/schema-notice';
 import { getLocalData, saveLocalData, syncLocalWithRemote, getLocalDataForInstitute } from '@/lib/storage-helper';
+
+const MONTH_NAMES = [
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
+];
+
+interface CalendarDay {
+  date: Date;
+  dateStr: string;
+  dayNumber: number;
+  isCurrentMonth: boolean;
+  isToday: boolean;
+  isWeekend: boolean;
+  isFuture: boolean;
+}
+
+function getMonthCalendarDays(year: number, month: number): CalendarDay[] {
+  const today = new Date();
+  const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+
+  const firstDayOfMonth = new Date(year, month, 1);
+  const lastDayOfMonth = new Date(year, month + 1, 0);
+
+  const days: CalendarDay[] = [];
+
+  // Monday = 0 ... Sunday = 6
+  const startDayOfWeek = (firstDayOfMonth.getDay() + 6) % 7;
+
+  // Previous month trailing days
+  const prevMonthLastDay = new Date(year, month, 0).getDate();
+  for (let i = startDayOfWeek - 1; i >= 0; i--) {
+    const d = new Date(year, month - 1, prevMonthLastDay - i);
+    const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    days.push({
+      date: d,
+      dateStr,
+      dayNumber: d.getDate(),
+      isCurrentMonth: false,
+      isToday: dateStr === todayStr,
+      isWeekend: d.getDay() === 0,
+      isFuture: d > today,
+    });
+  }
+
+  // Current month days
+  for (let i = 1; i <= lastDayOfMonth.getDate(); i++) {
+    const d = new Date(year, month, i);
+    const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
+    days.push({
+      date: d,
+      dateStr,
+      dayNumber: i,
+      isCurrentMonth: true,
+      isToday: dateStr === todayStr,
+      isWeekend: d.getDay() === 0,
+      isFuture: d > today,
+    });
+  }
+
+  // Next month leading days (fill row to complete multiple of 7)
+  const remaining = (7 - (days.length % 7)) % 7;
+  for (let i = 1; i <= remaining; i++) {
+    const d = new Date(year, month + 1, i);
+    const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    days.push({
+      date: d,
+      dateStr,
+      dayNumber: i,
+      isCurrentMonth: false,
+      isToday: dateStr === todayStr,
+      isWeekend: d.getDay() === 0,
+      isFuture: d > today,
+    });
+  }
+
+  return days;
+}
 
 export default function AttendancePage() {
   const { user, institute, activeChild, loading: authLoading } = useAuth();
@@ -38,10 +134,48 @@ export default function AttendancePage() {
   const [attendanceData, setAttendanceData] = useState<Record<string, AttendanceStatus>>({});
   const [parentAttendance, setParentAttendance] = useState<AttendanceRecord[]>([]);
 
+  // Calendar State
+  const now = new Date();
+  const [currentYear, setCurrentYear] = useState(now.getFullYear());
+  const [currentMonth, setCurrentMonth] = useState(now.getMonth());
+  const [selectedCalendarDate, setSelectedCalendarDate] = useState<string>(
+    `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+  );
+  const [attendanceViewMode, setAttendanceViewMode] = useState<'calendar' | 'list'>('calendar');
+  const [staffTab, setStaffTab] = useState<'rollcall' | 'calendar'>('rollcall');
+  const [selectedStudentForCalendar, setSelectedStudentForCalendar] = useState<string>('');
+
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [schemaMissing, setSchemaMissing] = useState(false);
   const [alertNotice, setAlertNotice] = useState<string | null>(null);
+
+  const handlePrevMonth = () => {
+    if (currentMonth === 0) {
+      setCurrentMonth(11);
+      setCurrentYear((y) => y - 1);
+    } else {
+      setCurrentMonth((m) => m - 1);
+    }
+  };
+
+  const handleNextMonth = () => {
+    if (currentMonth === 11) {
+      setCurrentMonth(0);
+      setCurrentYear((y) => y + 1);
+    } else {
+      setCurrentMonth((m) => m + 1);
+    }
+  };
+
+  const handleTodayJump = () => {
+    const today = new Date();
+    setCurrentYear(today.getFullYear());
+    setCurrentMonth(today.getMonth());
+    setSelectedCalendarDate(
+      `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
+    );
+  };
 
   // 1. Load Classes
   useEffect(() => {
@@ -284,106 +418,413 @@ export default function AttendancePage() {
   };
 
   // -------------------------------------------------------------
-  // PARENT VIEW: Personal Student Attendance & Calendar
+  // PARENT VIEW: Personal Student Attendance Calendar & Log
   // -------------------------------------------------------------
   if (!isStaff) {
-    const presentRecords = parentAttendance.filter((a) => a.status === 'present');
-    const absentRecords = parentAttendance.filter((a) => a.status === 'absent');
-    const lateRecords = parentAttendance.filter((a) => a.status === 'late');
-    const totalDays = parentAttendance.length;
-    const percentage =
-      totalDays > 0
-        ? Math.round(((presentRecords.length + lateRecords.length * 0.5) / totalDays) * 100)
+    const calendarDays = getMonthCalendarDays(currentYear, currentMonth);
+    const monthPrefix = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}`;
+
+    // Attendance stats for selected month
+    const monthAttendanceRecords = parentAttendance.filter((a) => a.date.startsWith(monthPrefix));
+    const monthPresent = monthAttendanceRecords.filter((a) => a.status === 'present').length;
+    const monthAbsent = monthAttendanceRecords.filter((a) => a.status === 'absent').length;
+    const monthLate = monthAttendanceRecords.filter((a) => a.status === 'late').length;
+    const monthTotal = monthAttendanceRecords.length;
+    const monthPercentage =
+      monthTotal > 0
+        ? Math.round(((monthPresent + monthLate * 0.5) / monthTotal) * 100)
         : 100;
 
+    // Overall stats
+    const totalPresent = parentAttendance.filter((a) => a.status === 'present').length;
+    const totalAbsent = parentAttendance.filter((a) => a.status === 'absent').length;
+    const totalLate = parentAttendance.filter((a) => a.status === 'late').length;
+    const totalDaysRecorded = parentAttendance.length;
+    const overallPercentage =
+      totalDaysRecorded > 0
+        ? Math.round(((totalPresent + totalLate * 0.5) / totalDaysRecorded) * 100)
+        : 100;
+
+    // Selected Day inspection
+    const selectedRecord = parentAttendance.find((a) => a.date === selectedCalendarDate);
+    const selectedDateParts = selectedCalendarDate.split('-');
+    const selectedDateObj =
+      selectedDateParts.length === 3
+        ? new Date(
+            parseInt(selectedDateParts[0], 10),
+            parseInt(selectedDateParts[1], 10) - 1,
+            parseInt(selectedDateParts[2], 10)
+          )
+        : new Date();
+    const isSelectedSunday = selectedDateObj.getDay() === 0;
+    const isSelectedFuture = selectedDateObj > new Date();
+
+    const selectedDateFormatted = selectedDateObj.toLocaleDateString('en-GB', {
+      weekday: 'long',
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+    });
+
+    const studentDisplayName = activeChild?.full_name || user?.full_name || 'Student';
+
     return (
-      <div className="space-y-5 animate-in fade-in duration-300">
+      <div className="space-y-4 sm:space-y-5 animate-in fade-in duration-300">
         <SchemaNotice visible={schemaMissing} />
 
-        <div className="bg-white rounded-3xl p-5 sm:p-6 border border-slate-200 shadow-sm">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
-              <CalendarCheck className="w-5 h-5" />
+        {/* Student Profile & Term Overview Card */}
+        <div className="bg-white rounded-3xl p-5 sm:p-6 border border-slate-100 shadow-sm space-y-4">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div className="flex items-center gap-3">
+              <div className="w-11 h-11 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+                <CalendarCheck className="w-5 h-5" />
+              </div>
+              <div>
+                <h2 className="text-base sm:text-lg font-bold text-slate-900 leading-tight">
+                  {studentDisplayName}&apos;s Attendance
+                </h2>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Roll #{activeChild?.roll_number || '001'} • Admission: {activeChild?.admission_number || 'ADM-9202'}
+                </p>
+              </div>
             </div>
-            <div>
-              <h2 className="text-base sm:text-lg font-bold text-slate-900">
-                {activeChild?.full_name ? `${activeChild.full_name}'s Attendance` : 'Attendance Record'}
-              </h2>
-              <p className="text-xs text-slate-500">
-                Roll #{activeChild?.roll_number || 'N/A'} • Admission: {activeChild?.admission_number || 'N/A'}
-              </p>
+
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold text-slate-500">Term Attendance:</span>
+              <span className="text-sm font-black text-emerald-600 bg-emerald-50 border border-emerald-200 px-3 py-1 rounded-xl">
+                {overallPercentage}%
+              </span>
             </div>
           </div>
 
-          {/* Monthly Summary Statistics */}
-          <div className="grid grid-cols-3 gap-3 mt-6">
-            <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-3.5 text-center">
-              <p className="text-[11px] font-bold text-emerald-800 uppercase">Present</p>
-              <p className="text-xl font-black text-emerald-600 mt-0.5">
-                {presentRecords.length} Days
-              </p>
+          {/* Quick Term Stats */}
+          <div className="grid grid-cols-3 gap-2.5 sm:gap-3">
+            <div className="bg-emerald-50/70 border border-emerald-100 rounded-2xl p-3 text-center">
+              <p className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider">Present</p>
+              <p className="text-xl font-black text-emerald-600 mt-0.5">{totalPresent} Days</p>
             </div>
-            <div className="bg-rose-50 border border-rose-200 rounded-2xl p-3.5 text-center">
-              <p className="text-[11px] font-bold text-rose-800 uppercase">Absent</p>
-              <p className="text-xl font-black text-rose-600 mt-0.5">
-                {absentRecords.length} Day{absentRecords.length !== 1 ? 's' : ''}
-              </p>
+            <div className="bg-rose-50/70 border border-rose-100 rounded-2xl p-3 text-center">
+              <p className="text-[10px] font-bold text-rose-800 uppercase tracking-wider">Absent</p>
+              <p className="text-xl font-black text-rose-600 mt-0.5">{totalAbsent} Days</p>
             </div>
-            <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3.5 text-center">
-              <p className="text-[11px] font-bold text-amber-800 uppercase">Late</p>
-              <p className="text-xl font-black text-amber-600 mt-0.5">
-                {lateRecords.length} Day{lateRecords.length !== 1 ? 's' : ''}
-              </p>
+            <div className="bg-amber-50/70 border border-amber-100 rounded-2xl p-3 text-center">
+              <p className="text-[10px] font-bold text-amber-800 uppercase tracking-wider">Late</p>
+              <p className="text-xl font-black text-amber-600 mt-0.5">{totalLate} Days</p>
             </div>
-          </div>
-
-          <div className="mt-5 p-4 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-700">Attendance Percentage:</span>
-            <span className="text-sm font-black text-emerald-600 bg-white px-3 py-1 rounded-xl border border-slate-200 shadow-sm">
-              {percentage}%
-            </span>
           </div>
         </div>
 
-        {/* Attendance Log */}
-        <div className="bg-white rounded-3xl p-5 border border-slate-200 shadow-sm">
-          <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wide mb-3">
-            Recent Attendance Log
-          </h3>
-          {parentAttendance.length === 0 ? (
-            <div className="p-8 text-center text-slate-400">
-              <CalendarCheck className="w-8 h-8 mx-auto mb-2 opacity-40 text-slate-400" />
-              <p className="text-xs font-semibold text-slate-600">No attendance entries recorded yet</p>
-              <p className="text-[11px] text-slate-400 mt-0.5">
-                Attendance updates appear immediately as teachers take roll call.
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {parentAttendance.map((item) => (
-                <div
-                  key={item.id}
-                  className="p-3 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-between"
+        {/* ========================================================================= */}
+        {/* ATTENDANCE CALENDAR CARD (Interactive Monthly Calendar Grid)              */}
+        {/* ========================================================================= */}
+        <div className="bg-white rounded-3xl p-4 sm:p-6 border border-slate-100 shadow-sm space-y-4">
+          {/* Calendar Header with Navigation and View Mode Toggle */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+            {/* Month & Year Navigation */}
+            <div className="flex items-center gap-2">
+              <div className="flex items-center bg-slate-50 border border-slate-200 rounded-2xl p-1">
+                <button
+                  onClick={handlePrevMonth}
+                  className="p-1.5 hover:bg-white text-slate-700 hover:text-slate-900 rounded-xl transition-all"
+                  aria-label="Previous Month"
+                  title="Previous Month"
                 >
-                  <div>
-                    <p className="text-xs font-bold text-slate-800">{item.date}</p>
-                    <p className="text-[11px] text-slate-500 mt-0.5">
-                      {item.remarks || `Marked ${item.status} during morning session`}
-                    </p>
-                  </div>
-                  <span
-                    className={`text-[10px] font-black uppercase px-2.5 py-1 rounded-md ${
-                      item.status === 'present'
-                        ? 'bg-emerald-100 text-emerald-800'
-                        : item.status === 'absent'
-                        ? 'bg-rose-100 text-rose-800'
-                        : 'bg-amber-100 text-amber-800'
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+                <span className="text-xs sm:text-sm font-black text-slate-900 px-3 min-w-[130px] sm:min-w-[145px] text-center select-none">
+                  {MONTH_NAMES[currentMonth]} {currentYear}
+                </span>
+                <button
+                  onClick={handleNextMonth}
+                  className="p-1.5 hover:bg-white text-slate-700 hover:text-slate-900 rounded-xl transition-all"
+                  aria-label="Next Month"
+                  title="Next Month"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+
+              <button
+                onClick={handleTodayJump}
+                className="bg-indigo-50 hover:bg-indigo-100 text-[#4338ca] text-xs font-bold px-3 py-2 rounded-2xl transition-all active:scale-95"
+              >
+                Today
+              </button>
+            </div>
+
+            {/* View Mode Toggle (Calendar vs List) */}
+            <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-2xl self-start sm:self-auto">
+              <button
+                onClick={() => setAttendanceViewMode('calendar')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                  attendanceViewMode === 'calendar'
+                    ? 'bg-white text-[#4338ca] shadow-sm'
+                    : 'text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                <Grid className="w-3.5 h-3.5" />
+                <span>Calendar</span>
+              </button>
+              <button
+                onClick={() => setAttendanceViewMode('list')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                  attendanceViewMode === 'list'
+                    ? 'bg-white text-[#4338ca] shadow-sm'
+                    : 'text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                <List className="w-3.5 h-3.5" />
+                <span>List Log</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Month Summary Bar */}
+          <div className="flex items-center justify-between gap-2 p-3 bg-slate-50 rounded-2xl text-xs flex-wrap font-medium">
+            <span className="text-slate-600">
+              {MONTH_NAMES[currentMonth]} Overview:
+            </span>
+            <div className="flex items-center gap-3 text-[11px] font-bold">
+              <span className="text-emerald-700 flex items-center gap-1">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" />
+                <span>{monthPresent} Present</span>
+              </span>
+              <span className="text-rose-700 flex items-center gap-1">
+                <span className="w-2 h-2 rounded-full bg-rose-500 inline-block" />
+                <span>{monthAbsent} Absent</span>
+              </span>
+              <span className="text-amber-700 flex items-center gap-1">
+                <span className="w-2 h-2 rounded-full bg-amber-500 inline-block" />
+                <span>{monthLate} Late</span>
+              </span>
+              <span className="text-indigo-700 bg-white px-2 py-0.5 rounded-lg border border-slate-200">
+                {monthPercentage}% Rate
+              </span>
+            </div>
+          </div>
+
+          {attendanceViewMode === 'calendar' ? (
+            <>
+              {/* Calendar Days Header */}
+              <div className="grid grid-cols-7 gap-1 sm:gap-2 text-center">
+                {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((dayName, idx) => (
+                  <div
+                    key={dayName}
+                    className={`text-[10px] sm:text-xs font-extrabold uppercase tracking-wider py-1.5 ${
+                      idx === 6 ? 'text-rose-500 font-black' : 'text-slate-400'
                     }`}
                   >
-                    {item.status}
-                  </span>
+                    {dayName}
+                  </div>
+                ))}
+              </div>
+
+              {/* Calendar Grid (7 columns) */}
+              <div className="grid grid-cols-7 gap-1 sm:gap-2">
+                {calendarDays.map((day) => {
+                  const record = parentAttendance.find((a) => a.date === day.dateStr);
+                  const isSelected = selectedCalendarDate === day.dateStr;
+
+                  return (
+                    <div
+                      key={day.dateStr}
+                      onClick={() => setSelectedCalendarDate(day.dateStr)}
+                      className={`min-h-[52px] sm:min-h-[64px] p-1 sm:p-2 rounded-2xl border transition-all cursor-pointer flex flex-col justify-between select-none relative ${
+                        !day.isCurrentMonth
+                          ? 'opacity-30 bg-slate-50/50 border-transparent text-slate-400'
+                          : isSelected
+                          ? 'ring-2 ring-[#4338ca] border-indigo-400 bg-indigo-50/40 shadow-sm'
+                          : day.isToday
+                          ? 'border-indigo-400 bg-white shadow-sm'
+                          : 'border-slate-100 hover:border-slate-200 bg-white'
+                      }`}
+                    >
+                      {/* Day Number + Today Indicator */}
+                      <div className="flex items-center justify-between">
+                        <span
+                          className={`text-xs sm:text-sm font-bold ${
+                            day.isToday
+                              ? 'text-[#4338ca] font-black'
+                              : day.isWeekend
+                              ? 'text-rose-500 font-semibold'
+                              : 'text-slate-800'
+                          }`}
+                        >
+                          {day.dayNumber}
+                        </span>
+                        {day.isToday && (
+                          <span className="w-1.5 h-1.5 rounded-full bg-[#4338ca]" title="Today" />
+                        )}
+                      </div>
+
+                      {/* Status Indicator */}
+                      <div className="mt-1">
+                        {record ? (
+                          record.status === 'present' ? (
+                            <div className="w-full py-0.5 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 text-[9px] font-black flex items-center justify-center gap-1">
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
+                              <span className="hidden sm:inline">Present</span>
+                            </div>
+                          ) : record.status === 'absent' ? (
+                            <div className="w-full py-0.5 rounded-lg bg-rose-50 text-rose-700 border border-rose-200 text-[9px] font-black flex items-center justify-center gap-1">
+                              <span className="w-1.5 h-1.5 rounded-full bg-rose-500 shrink-0" />
+                              <span className="hidden sm:inline">Absent</span>
+                            </div>
+                          ) : (
+                            <div className="w-full py-0.5 rounded-lg bg-amber-50 text-amber-700 border border-amber-200 text-[9px] font-black flex items-center justify-center gap-1">
+                              <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />
+                              <span className="hidden sm:inline">Late</span>
+                            </div>
+                          )
+                        ) : day.isWeekend ? (
+                          <span className="text-[9px] text-slate-400 block text-center font-medium">
+                            Holiday
+                          </span>
+                        ) : day.isFuture ? (
+                          <span className="text-[9px] text-slate-300 block text-center">—</span>
+                        ) : (
+                          <span className="text-[9px] text-slate-300 block text-center font-medium">
+                            —
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Selected Day Inspector Detail Card */}
+              <div className="mt-3 p-3.5 sm:p-4 rounded-2xl bg-gradient-to-r from-slate-50 to-indigo-50/40 border border-slate-100 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-2xl bg-white border border-slate-200 shadow-sm flex flex-col items-center justify-center text-slate-800 shrink-0">
+                    <span className="text-[9px] font-bold uppercase text-slate-400 leading-none">
+                      {MONTH_NAMES[selectedDateObj.getMonth()]?.slice(0, 3)}
+                    </span>
+                    <span className="text-sm font-black text-slate-900 leading-tight">
+                      {selectedDateObj.getDate()}
+                    </span>
+                  </div>
+
+                  <div>
+                    <p className="text-xs font-bold text-slate-900 leading-tight">
+                      {selectedDateFormatted}
+                    </p>
+                    <p className="text-[11px] text-slate-500 mt-0.5">
+                      {selectedRecord?.remarks ||
+                        (selectedRecord
+                          ? `Roll call marked ${selectedRecord.status}`
+                          : isSelectedSunday
+                          ? 'Weekly Sunday School Holiday'
+                          : isSelectedFuture
+                          ? 'Upcoming school day'
+                          : 'No roll call recorded on this date')}
+                    </p>
+                  </div>
                 </div>
-              ))}
+
+                <div>
+                  {selectedRecord ? (
+                    <span
+                      className={`text-xs font-black uppercase px-3 py-1 rounded-xl shadow-sm inline-flex items-center gap-1.5 ${
+                        selectedRecord.status === 'present'
+                          ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                          : selectedRecord.status === 'absent'
+                          ? 'bg-rose-100 text-rose-800 border border-rose-200'
+                          : 'bg-amber-100 text-amber-800 border border-amber-200'
+                      }`}
+                    >
+                      <span
+                        className={`w-2 h-2 rounded-full ${
+                          selectedRecord.status === 'present'
+                            ? 'bg-emerald-600'
+                            : selectedRecord.status === 'absent'
+                            ? 'bg-rose-600'
+                            : 'bg-amber-600'
+                        }`}
+                      />
+                      <span>{selectedRecord.status}</span>
+                    </span>
+                  ) : isSelectedSunday ? (
+                    <span className="text-xs font-semibold px-2.5 py-1 rounded-xl bg-slate-100 text-slate-600">
+                      Holiday
+                    </span>
+                  ) : isSelectedFuture ? (
+                    <span className="text-xs font-medium px-2.5 py-1 rounded-xl bg-slate-100 text-slate-400">
+                      Upcoming
+                    </span>
+                  ) : (
+                    <span className="text-xs font-medium px-2.5 py-1 rounded-xl bg-slate-100 text-slate-500">
+                      Unrecorded
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Calendar Color Legend */}
+              <div className="flex items-center justify-center gap-4 pt-2 border-t border-slate-100 text-[11px] font-semibold text-slate-500 flex-wrap">
+                <span className="flex items-center gap-1.5">
+                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
+                  <span>Present</span>
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <span className="w-2.5 h-2.5 rounded-full bg-rose-500" />
+                  <span>Absent</span>
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <span className="w-2.5 h-2.5 rounded-full bg-amber-500" />
+                  <span>Late</span>
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <span className="w-2.5 h-2.5 rounded-full bg-slate-300" />
+                  <span>Weekend Holiday</span>
+                </span>
+              </div>
+            </>
+          ) : (
+            /* List Log View */
+            <div className="space-y-2">
+              {parentAttendance.length === 0 ? (
+                <div className="p-8 text-center text-slate-400">
+                  <CalendarCheck className="w-8 h-8 mx-auto mb-2 opacity-40 text-slate-400" />
+                  <p className="text-xs font-semibold text-slate-600">
+                    No attendance entries recorded yet
+                  </p>
+                  <p className="text-[11px] text-slate-400 mt-0.5">
+                    Attendance updates appear immediately as teachers take roll call.
+                  </p>
+                </div>
+              ) : (
+                parentAttendance.map((item) => (
+                  <div
+                    key={item.id}
+                    className="p-3.5 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-between hover:border-indigo-100 transition-colors"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-xs font-bold text-slate-700">
+                        {item.date.slice(-2)}
+                      </div>
+                      <div>
+                        <p className="text-xs font-bold text-slate-800">{item.date}</p>
+                        <p className="text-[11px] text-slate-500 mt-0.5">
+                          {item.remarks || `Marked ${item.status} during morning session`}
+                        </p>
+                      </div>
+                    </div>
+
+                    <span
+                      className={`text-[10px] font-black uppercase px-2.5 py-1 rounded-xl ${
+                        item.status === 'present'
+                          ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                          : item.status === 'absent'
+                          ? 'bg-rose-100 text-rose-800 border border-rose-200'
+                          : 'bg-amber-100 text-amber-800 border border-amber-200'
+                      }`}
+                    >
+                      {item.status}
+                    </span>
+                  </div>
+                ))
+              )}
             </div>
           )}
         </div>

@@ -234,8 +234,10 @@ export function TopBar() {
           <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
             {pathname !== '/login' && (
               <>
-                {/* Child Switcher if parent */}
-                <ChildSwitcher variant={isStudentView ? 'light' : 'dark'} />
+                {/* Child Switcher if parent - hidden on mobile screens */}
+                <div className="hidden sm:block">
+                  <ChildSwitcher variant={isStudentView ? 'light' : 'dark'} />
+                </div>
 
                 {/* Install App Link */}
                 <Link
