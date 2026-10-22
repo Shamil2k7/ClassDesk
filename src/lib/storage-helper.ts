@@ -32,10 +32,13 @@ export function getLocalDataForInstitute<T extends { institute_id?: string | nul
 ): T[] {
   const all = getLocalData<T>(key, fallback);
   if (!instituteId) return all;
-  if (instituteId === DEFAULT_DEMO_INSTITUTE_ID) {
-    return all.filter((item) => !item.institute_id || item.institute_id === instituteId);
-  }
-  return all.filter((item) => item.institute_id === instituteId);
+  const filtered = all.filter(
+    (item) =>
+      !item.institute_id ||
+      item.institute_id === instituteId ||
+      item.institute_id === DEFAULT_DEMO_INSTITUTE_ID
+  );
+  return filtered.length > 0 ? filtered : all;
 }
 
 export function saveLocalData<T>(key: string, data: T[]): void {

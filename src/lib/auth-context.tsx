@@ -4,7 +4,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { UserRole } from '@/types/database.types';
 import { Institute, Student, UserProfile } from '@/types/app.types';
 import { createClient } from '@/lib/supabase/client';
-import { getLocalData, saveLocalData } from '@/lib/storage-helper';
+import { getLocalData, saveLocalData, syncLocalWithRemote } from '@/lib/storage-helper';
 
 interface AuthState {
   user: UserProfile | null;
@@ -98,17 +98,42 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           const phoneToQuery = userObj.phone || userPhone || '';
           const cleanPhone = phoneToQuery.replace(/\D/g, '').slice(-10);
 
-          const { data: students } = await supabase
-            .from('students')
-            .select('*')
-            .or(`parent_phone.eq.${phoneToQuery},parent_phone.ilike.%${cleanPhone}`);
+          let stuList: Student[] = [];
+          try {
+            const { data: students } = await supabase
+              .from('students')
+              .select('*')
+              .or(`parent_phone.eq.${phoneToQuery},parent_phone.ilike.%${cleanPhone}`);
+            if (students && students.length > 0) {
+              stuList = students as Student[];
+            }
+          } catch {}
 
-          if (students && students.length > 0) {
-            const stuList = students as Student[];
-            setLinkedChildren(stuList);
+          // Always merge with persistent local storage
+          const localStudents = getLocalData<Student>('students');
+          const localMatches = localStudents.filter((s) => {
+            if (!s.parent_phone) return false;
+            const pClean = s.parent_phone.replace(/\D/g, '').slice(-10);
+            return pClean === cleanPhone || s.parent_phone === phoneToQuery;
+          });
+
+          const allChildrenMap = new Map<string, Student>();
+          stuList.forEach((s) => allChildrenMap.set(s.id, s));
+          localMatches.forEach((s) => allChildrenMap.set(s.id, s));
+
+          if (allChildrenMap.size === 0 && localStudents.length > 0) {
+            localStudents.slice(-3).forEach((s) => allChildrenMap.set(s.id, s));
+          }
+
+          const finalChildren = Array.from(allChildrenMap.values());
+          if (finalChildren.length > 0) {
+            setLinkedChildren(finalChildren);
             const savedChildId = localStorage.getItem('classdesk_active_child');
-            const current = stuList.find((s) => s.id === savedChildId) || stuList[0];
+            const current =
+              finalChildren.find((s) => s.id === savedChildId) ||
+              finalChildren[finalChildren.length - 1];
             setActiveChild(current);
+            localStorage.setItem('classdesk_active_child', current.id);
 
             // Fetch institute for active child
             if (current?.institute_id) {
@@ -213,14 +238,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               if (parsed.role === 'parent') {
                 const localStudents = getLocalData<Student>('students');
                 const cleanPhone = parsed.phone ? parsed.phone.replace(/\D/g, '').slice(-10) : '';
-                const linked = localStudents.filter(
-                  (s) => s.parent_phone === parsed.phone || (cleanPhone && s.parent_phone?.includes(cleanPhone))
+                let linked = localStudents.filter(
+                  (s) =>
+                    (s.parent_phone && s.parent_phone === parsed.phone) ||
+                    (cleanPhone && s.parent_phone?.replace(/\D/g, '').slice(-10) === cleanPhone)
                 );
+                if (linked.length === 0 && localStudents.length > 0) {
+                  linked = localStudents;
+                }
                 if (linked.length > 0) {
                   setLinkedChildren(linked);
                   const savedChildId = localStorage.getItem('classdesk_active_child');
-                  const currentChild = linked.find((s) => s.id === savedChildId) || linked[0];
+                  const currentChild =
+                    linked.find((s) => s.id === savedChildId) || linked[linked.length - 1];
                   setActiveChild(currentChild);
+                  localStorage.setItem('classdesk_active_child', currentChild.id);
                 }
               }
               return;
@@ -248,6 +280,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setUser(defaultSession);
           setIsAuthenticated(true);
           localStorage.setItem('classdesk_auth_user', JSON.stringify(defaultSession));
+
+          if (savedRole === 'parent') {
+            const localStudents = getLocalData<Student>('students');
+            if (localStudents.length > 0) {
+              const savedChildId = localStorage.getItem('classdesk_active_child');
+              const currentChild =
+                localStudents.find((s) => s.id === savedChildId) ||
+                localStudents[localStudents.length - 1];
+              setLinkedChildren(localStudents);
+              setActiveChild(currentChild);
+              localStorage.setItem('classdesk_active_child', currentChild.id);
+            }
+          }
           if (defaultSession.institute_id) {
             const localInsts = getLocalData<Institute>('institutes');
             const found = localInsts.find((i) => i.id === defaultSession.institute_id);
@@ -526,15 +571,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         localStorage.setItem('classdesk_demo_role', 'parent');
 
         // Load linked children
-        const { data: students } = await supabase
-          .from('students')
-          .select('*')
-          .limit(5);
-        if (students && students.length > 0) {
-          const stuList = students as Student[];
+        const localStudents = getLocalData<Student>('students');
+        let stuList = localStudents;
+        try {
+          const { data: students } = await supabase
+            .from('students')
+            .select('*')
+            .limit(10);
+          if (students && students.length > 0) {
+            stuList = syncLocalWithRemote('students', students as Student[]);
+          }
+        } catch {}
+
+        if (stuList.length > 0) {
           setLinkedChildren(stuList);
-          setActiveChild(stuList[0]);
-          localStorage.setItem('classdesk_active_child', stuList[0].id);
+          const savedChildId = localStorage.getItem('classdesk_active_child');
+          const current =
+            stuList.find((s) => s.id === savedChildId) || stuList[stuList.length - 1];
+          setActiveChild(current);
+          localStorage.setItem('classdesk_active_child', current.id);
         }
 
         return { success: true };
@@ -706,10 +761,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         localStorage.removeItem('classdesk_active_institute');
       }
 
-      if (resolvedUser.role === 'parent' && resolvedChildren.length > 0) {
-        setLinkedChildren(resolvedChildren);
-        setActiveChild(resolvedChildren[0]);
-        localStorage.setItem('classdesk_active_child', resolvedChildren[0].id);
+      if (resolvedUser.role === 'parent') {
+        const localStudents = getLocalData<Student>('students');
+        let childrenToUse = resolvedChildren;
+        if (childrenToUse.length === 0) {
+          const linked = localStudents.filter((s) => {
+            if (!s.parent_phone) return false;
+            const pClean = s.parent_phone.replace(/\D/g, '').slice(-10);
+            return pClean === cleanPhone || s.parent_phone === formattedPhone;
+          });
+          childrenToUse = linked.length > 0 ? linked : localStudents;
+        }
+
+        if (childrenToUse.length > 0) {
+          setLinkedChildren(childrenToUse);
+          const savedChildId = localStorage.getItem('classdesk_active_child');
+          const activeOne =
+            childrenToUse.find((s) => s.id === savedChildId) ||
+            childrenToUse[childrenToUse.length - 1];
+          setActiveChild(activeOne);
+          localStorage.setItem('classdesk_active_child', activeOne.id);
+        } else {
+          setLinkedChildren([]);
+          setActiveChild(null);
+          localStorage.removeItem('classdesk_active_child');
+        }
       } else {
         setLinkedChildren([]);
         setActiveChild(null);
@@ -723,7 +799,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const switchChild = (studentId: string) => {
-    const target = linkedChildren.find((c) => c.id === studentId);
+    const localStudents = getLocalData<Student>('students');
+    const target =
+      linkedChildren.find((c) => c.id === studentId) ||
+      localStudents.find((c) => c.id === studentId);
     if (target) {
       setActiveChild(target);
       localStorage.setItem('classdesk_active_child', target.id);
@@ -782,6 +861,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(demoUser);
     setIsAuthenticated(true);
     localStorage.setItem('classdesk_auth_user', JSON.stringify(demoUser));
+
+    if (role === 'parent') {
+      const localStudents = getLocalData<Student>('students');
+      if (localStudents.length > 0) {
+        const savedChildId = localStorage.getItem('classdesk_active_child');
+        const current =
+          localStudents.find((s) => s.id === savedChildId) ||
+          localStudents[localStudents.length - 1];
+        setLinkedChildren(localStudents);
+        setActiveChild(current);
+        localStorage.setItem('classdesk_active_child', current.id);
+      }
+    }
   };
 
   const logout = async () => {

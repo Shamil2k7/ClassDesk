@@ -295,26 +295,29 @@ export default function DashboardPage() {
   // -------------------------------------------------------------
   if (role === 'parent') {
     const todayStr = new Date().toISOString().split('T')[0];
+    const effectiveStudent = activeChild || (students && students.length > 0 ? students[0] : null);
+    const effectiveStudentId = effectiveStudent?.id;
+
     const todayAttendance = attendance.find(
-      (a) => a.student_id === activeChild?.id && a.date === todayStr
+      (a) => a.student_id === effectiveStudentId && a.date === todayStr
     );
 
     const pendingDues = feeDues.filter(
-      (d) => d.student_id === activeChild?.id && d.status !== 'paid'
+      (d) => d.student_id === effectiveStudentId && d.status !== 'paid'
     );
     const totalDue = pendingDues.reduce(
       (acc, curr) => acc + (curr.original_amount - curr.paid_amount),
       0
     );
 
-    const childAttendanceRecords = attendance.filter((a) => a.student_id === activeChild?.id);
+    const childAttendanceRecords = attendance.filter((a) => a.student_id === effectiveStudentId);
     const presentDays = childAttendanceRecords.filter((a) => a.status === 'present').length;
     const absentDays = childAttendanceRecords.filter((a) => a.status === 'absent').length;
     const totalDays = childAttendanceRecords.length;
     const attendancePct = totalDays > 0 ? Math.round((presentDays / totalDays) * 100) : 0;
 
     const childAnnouncements = announcements.filter(
-      (a) => a.target_type === 'all' || (activeChild && a.target_class_id === activeChild.class_id)
+      (a) => a.target_type === 'all' || (effectiveStudent && a.target_class_id === effectiveStudent.class_id)
     );
 
     // Sample announcement if none exists so UI matches user reference
@@ -324,32 +327,32 @@ export default function DashboardPage() {
         : [
             {
               id: 'sample-welcome',
-              title: 'Good morning',
-              content: 'asadfdsf',
+              title: 'Welcome to ClassDesk',
+              content: 'All updates, class schedules, and notices will appear here.',
               target_type: 'all',
               created_at: new Date().toISOString(),
             },
           ];
 
-    const studentClass = classes.find((c) => c.id === activeChild?.class_id);
-    const studentClassName = studentClass?.name || 'BCA';
-    const studentName = activeChild?.full_name || 'shamil k';
+    const studentClass = classes.find((c) => c.id === effectiveStudent?.class_id);
+    const studentClassName = studentClass?.name || 'Class Student';
+    const studentName = effectiveStudent?.full_name || user?.full_name || 'Active Student';
     const studentInitials =
       studentName
         .split(' ')
         .filter(Boolean)
         .slice(0, 2)
         .map((w) => w[0].toUpperCase())
-        .join('') || 'SH';
-    const rollDisplay = activeChild?.roll_number
-      ? `#${String(activeChild.roll_number).padStart(3, '0')}`
-      : '#001';
-    const admDisplay = activeChild?.admission_number || 'ADM-9202';
+        .join('') || 'ST';
+    const rollDisplay = effectiveStudent?.roll_number
+      ? `#${String(effectiveStudent.roll_number).padStart(3, '0')}`
+      : 'N/A';
+    const admDisplay = effectiveStudent?.admission_number || 'N/A';
 
     const todayOnlineClass = (onlineClasses || []).find(
       (oc) =>
         (oc.status === 'live' || (oc.date === todayStr && oc.status === 'scheduled')) &&
-        (!activeChild?.class_id || oc.class_id === activeChild.class_id)
+        (!effectiveStudent?.class_id || oc.class_id === effectiveStudent.class_id)
     );
 
     const handleOpenDrawer = () => {
@@ -362,7 +365,7 @@ export default function DashboardPage() {
       <div className="space-y-4 sm:space-y-5 animate-in fade-in duration-300">
         <SchemaNotice visible={schemaMissing} />
 
-        {/* 1. Student Profile Gradient Banner */}
+        {/* 1. Student Profile Gradient Banner (Header Name Section) */}
         <div className="bg-gradient-to-r from-[#292ba5] via-[#3739bf] to-[#4338ca] text-white rounded-3xl p-5 sm:p-6 shadow-md relative overflow-hidden">
           <GraduationWatermarkGraphic />
 
@@ -466,7 +469,119 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {/* 2. Fee Due & Attendance Cards (2-Column Grid) */}
+        {/* 2. Quick Actions (Positioned directly below Header Name Section) */}
+        <div className="space-y-3">
+          <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+            <Zap className="w-4 h-4 text-[#6366f1]" />
+            <span>Quick Actions</span>
+          </h3>
+
+          <div className="grid grid-cols-3 gap-2 sm:gap-3">
+            {/* 1. View Fees */}
+            <Link
+              href="/fees"
+              className="bg-white rounded-2xl p-2.5 sm:p-3.5 border border-slate-100 shadow-sm hover:border-indigo-100 hover:shadow-md transition-all flex items-center gap-2 sm:gap-3 group"
+            >
+              <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-[#f5f3ff] text-[#8b5cf6] flex items-center justify-center shrink-0">
+                <CreditCard className="w-4 h-4 sm:w-4.5 sm:h-4.5" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-[11px] sm:text-xs font-bold text-slate-900 truncate">View Fees</p>
+                <p className="text-[9px] sm:text-[10px] text-slate-400 truncate mt-0.5">
+                  Check fee dues
+                </p>
+              </div>
+              <ChevronRight className="w-3.5 h-3.5 text-slate-300 group-hover:text-indigo-600 group-hover:translate-x-0.5 transition-all shrink-0 hidden xs:block" />
+            </Link>
+
+            {/* 2. Attendance */}
+            <Link
+              href="/attendance"
+              className="bg-white rounded-2xl p-2.5 sm:p-3.5 border border-slate-100 shadow-sm hover:border-emerald-100 hover:shadow-md transition-all flex items-center gap-2 sm:gap-3 group"
+            >
+              <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-[#ecfdf5] text-[#10b981] flex items-center justify-center shrink-0">
+                <CalendarCheck className="w-4 h-4 sm:w-4.5 sm:h-4.5" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-[11px] sm:text-xs font-bold text-slate-900 truncate">Attendance</p>
+                <p className="text-[9px] sm:text-[10px] text-slate-400 truncate mt-0.5">
+                  View calendar log
+                </p>
+              </div>
+              <ChevronRight className="w-3.5 h-3.5 text-slate-300 group-hover:text-emerald-600 group-hover:translate-x-0.5 transition-all shrink-0 hidden xs:block" />
+            </Link>
+
+            {/* 3. Timetable */}
+            <Link
+              href="/timetable"
+              className="bg-white rounded-2xl p-2.5 sm:p-3.5 border border-slate-100 shadow-sm hover:border-blue-100 hover:shadow-md transition-all flex items-center gap-2 sm:gap-3 group"
+            >
+              <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-[#eff6ff] text-[#3b82f6] flex items-center justify-center shrink-0">
+                <Clock className="w-4 h-4 sm:w-4.5 sm:h-4.5" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-[11px] sm:text-xs font-bold text-slate-900 truncate">Timetable</p>
+                <p className="text-[9px] sm:text-[10px] text-slate-400 truncate mt-0.5">
+                  Class schedule
+                </p>
+              </div>
+              <ChevronRight className="w-3.5 h-3.5 text-slate-300 group-hover:text-blue-600 group-hover:translate-x-0.5 transition-all shrink-0 hidden xs:block" />
+            </Link>
+
+            {/* 4. Exam Marks */}
+            <Link
+              href="/exams"
+              className="bg-white rounded-2xl p-2.5 sm:p-3.5 border border-slate-100 shadow-sm hover:border-orange-100 hover:shadow-md transition-all flex items-center gap-2 sm:gap-3 group"
+            >
+              <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-[#fff7ed] text-[#f97316] flex items-center justify-center shrink-0">
+                <FileText className="w-4 h-4 sm:w-4.5 sm:h-4.5" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-[11px] sm:text-xs font-bold text-slate-900 truncate">Exam Marks</p>
+                <p className="text-[9px] sm:text-[10px] text-slate-400 truncate mt-0.5">
+                  View report card
+                </p>
+              </div>
+              <ChevronRight className="w-3.5 h-3.5 text-slate-300 group-hover:text-orange-600 group-hover:translate-x-0.5 transition-all shrink-0 hidden xs:block" />
+            </Link>
+
+            {/* 5. Online Classes */}
+            <Link
+              href="/online-classes"
+              className="bg-white rounded-2xl p-2.5 sm:p-3.5 border border-slate-100 shadow-sm hover:border-rose-100 hover:shadow-md transition-all flex items-center gap-2 sm:gap-3 group"
+            >
+              <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center shrink-0">
+                <Video className="w-4 h-4 sm:w-4.5 sm:h-4.5" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-[11px] sm:text-xs font-bold text-slate-900 truncate">Zoom Live</p>
+                <p className="text-[9px] sm:text-[10px] text-slate-400 truncate mt-0.5">
+                  Live lecture room
+                </p>
+              </div>
+              <ChevronRight className="w-3.5 h-3.5 text-slate-300 group-hover:text-rose-600 group-hover:translate-x-0.5 transition-all shrink-0 hidden xs:block" />
+            </Link>
+
+            {/* 6. Upload Notes */}
+            <Link
+              href="/notes"
+              className="bg-white rounded-2xl p-2.5 sm:p-3.5 border border-slate-100 shadow-sm hover:border-red-100 hover:shadow-md transition-all flex items-center gap-2 sm:gap-3 group"
+            >
+              <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-[#fef2f2] text-[#ef4444] flex items-center justify-center shrink-0">
+                <CloudUpload className="w-4 h-4 sm:w-4.5 sm:h-4.5" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-[11px] sm:text-xs font-bold text-slate-900 truncate">Notes</p>
+                <p className="text-[9px] sm:text-[10px] text-slate-400 truncate mt-0.5">
+                  PDF & study docs
+                </p>
+              </div>
+              <ChevronRight className="w-3.5 h-3.5 text-slate-300 group-hover:text-red-600 group-hover:translate-x-0.5 transition-all shrink-0 hidden xs:block" />
+            </Link>
+          </div>
+        </div>
+
+        {/* 3. Fee Due & Attendance Cards (2-Column Grid) */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
           {/* Card 1: Fee Due */}
           <div className="bg-white rounded-3xl p-5 border border-slate-100 shadow-sm flex flex-col justify-between">
@@ -552,7 +667,7 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* 3. School Announcements Section */}
+        {/* 4. School Announcements Section */}
         <div className="bg-white rounded-3xl p-5 border border-slate-100 shadow-sm space-y-3">
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
@@ -607,118 +722,6 @@ export default function DashboardPage() {
                 </div>
               </Link>
             ))}
-          </div>
-        </div>
-
-        {/* 4. Quick Actions (3-Column Grid) */}
-        <div className="space-y-3">
-          <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-            <Zap className="w-4 h-4 text-[#6366f1]" />
-            <span>Quick Actions</span>
-          </h3>
-
-          <div className="grid grid-cols-3 gap-2 sm:gap-3">
-            {/* 1. View Fees */}
-            <Link
-              href="/fees"
-              className="bg-white rounded-2xl p-2.5 sm:p-3.5 border border-slate-100 shadow-sm hover:border-indigo-100 hover:shadow-md transition-all flex items-center gap-2 sm:gap-3 group"
-            >
-              <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-[#f5f3ff] text-[#8b5cf6] flex items-center justify-center shrink-0">
-                <CreditCard className="w-4 h-4 sm:w-4.5 sm:h-4.5" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-[11px] sm:text-xs font-bold text-slate-900 truncate">View Fees</p>
-                <p className="text-[9px] sm:text-[10px] text-slate-400 truncate mt-0.5">
-                  Check your fee details
-                </p>
-              </div>
-              <ChevronRight className="w-3.5 h-3.5 text-slate-300 group-hover:text-indigo-600 group-hover:translate-x-0.5 transition-all shrink-0 hidden xs:block" />
-            </Link>
-
-            {/* 2. Attendance */}
-            <Link
-              href="/attendance"
-              className="bg-white rounded-2xl p-2.5 sm:p-3.5 border border-slate-100 shadow-sm hover:border-emerald-100 hover:shadow-md transition-all flex items-center gap-2 sm:gap-3 group"
-            >
-              <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-[#ecfdf5] text-[#10b981] flex items-center justify-center shrink-0">
-                <CalendarCheck className="w-4 h-4 sm:w-4.5 sm:h-4.5" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-[11px] sm:text-xs font-bold text-slate-900 truncate">Attendance</p>
-                <p className="text-[9px] sm:text-[10px] text-slate-400 truncate mt-0.5">
-                  View your attendance
-                </p>
-              </div>
-              <ChevronRight className="w-3.5 h-3.5 text-slate-300 group-hover:text-emerald-600 group-hover:translate-x-0.5 transition-all shrink-0 hidden xs:block" />
-            </Link>
-
-            {/* 3. Timetable */}
-            <Link
-              href="/timetable"
-              className="bg-white rounded-2xl p-2.5 sm:p-3.5 border border-slate-100 shadow-sm hover:border-blue-100 hover:shadow-md transition-all flex items-center gap-2 sm:gap-3 group"
-            >
-              <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-[#eff6ff] text-[#3b82f6] flex items-center justify-center shrink-0">
-                <Clock className="w-4 h-4 sm:w-4.5 sm:h-4.5" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-[11px] sm:text-xs font-bold text-slate-900 truncate">Timetable</p>
-                <p className="text-[9px] sm:text-[10px] text-slate-400 truncate mt-0.5">
-                  See your class schedule
-                </p>
-              </div>
-              <ChevronRight className="w-3.5 h-3.5 text-slate-300 group-hover:text-blue-600 group-hover:translate-x-0.5 transition-all shrink-0 hidden xs:block" />
-            </Link>
-
-            {/* 4. Exam Marks */}
-            <Link
-              href="/exams"
-              className="bg-white rounded-2xl p-2.5 sm:p-3.5 border border-slate-100 shadow-sm hover:border-orange-100 hover:shadow-md transition-all flex items-center gap-2 sm:gap-3 group"
-            >
-              <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-[#fff7ed] text-[#f97316] flex items-center justify-center shrink-0">
-                <FileText className="w-4 h-4 sm:w-4.5 sm:h-4.5" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-[11px] sm:text-xs font-bold text-slate-900 truncate">Exam Marks</p>
-                <p className="text-[9px] sm:text-[10px] text-slate-400 truncate mt-0.5">
-                  View your results
-                </p>
-              </div>
-              <ChevronRight className="w-3.5 h-3.5 text-slate-300 group-hover:text-orange-600 group-hover:translate-x-0.5 transition-all shrink-0 hidden xs:block" />
-            </Link>
-
-            {/* 5. Upload Notes */}
-            <Link
-              href="/notes"
-              className="bg-white rounded-2xl p-2.5 sm:p-3.5 border border-slate-100 shadow-sm hover:border-red-100 hover:shadow-md transition-all flex items-center gap-2 sm:gap-3 group"
-            >
-              <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-[#fef2f2] text-[#ef4444] flex items-center justify-center shrink-0">
-                <CloudUpload className="w-4 h-4 sm:w-4.5 sm:h-4.5" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-[11px] sm:text-xs font-bold text-slate-900 truncate">Upload Notes</p>
-                <p className="text-[9px] sm:text-[10px] text-slate-400 truncate mt-0.5">
-                  PDF & study materials
-                </p>
-              </div>
-              <ChevronRight className="w-3.5 h-3.5 text-slate-300 group-hover:text-red-600 group-hover:translate-x-0.5 transition-all shrink-0 hidden xs:block" />
-            </Link>
-
-            {/* 6. More */}
-            <button
-              onClick={handleOpenDrawer}
-              className="bg-white rounded-2xl p-2.5 sm:p-3.5 border border-slate-100 shadow-sm hover:border-indigo-100 hover:shadow-md transition-all flex items-center gap-2 sm:gap-3 group text-left"
-            >
-              <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-[#f1f5f9] text-[#475569] flex items-center justify-center shrink-0">
-                <LayoutGrid className="w-4 h-4 sm:w-4.5 sm:h-4.5" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-[11px] sm:text-xs font-bold text-slate-900 truncate">More</p>
-                <p className="text-[9px] sm:text-[10px] text-slate-400 truncate mt-0.5">
-                  Extra features
-                </p>
-              </div>
-              <ChevronRight className="w-3.5 h-3.5 text-slate-300 group-hover:text-slate-600 group-hover:translate-x-0.5 transition-all shrink-0 hidden xs:block" />
-            </button>
           </div>
         </div>
       </div>
@@ -785,7 +788,116 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* 2. KPI Cards (2x2 Grid) */}
+      {/* 2. Quick Actions Section (Positioned directly below Header Name Section) */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+            <Zap className="w-4 h-4 text-[#6366f1]" />
+            <span>Quick Actions</span>
+          </h3>
+          <Link
+            href="/classes"
+            className="text-xs font-bold text-[#4338ca] hover:underline flex items-center gap-1"
+          >
+            <span>View All</span>
+            <ArrowRight className="w-3.5 h-3.5" />
+          </Link>
+        </div>
+
+        <div className="grid grid-cols-3 gap-2 sm:gap-3">
+          {/* Card 1: Record Fee */}
+          <Link
+            href="/fees"
+            className="bg-white rounded-2xl p-2.5 sm:p-3.5 border border-slate-100 shadow-sm hover:border-indigo-100 hover:shadow-md transition-all flex items-center gap-2 sm:gap-3 group"
+          >
+            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-[#f5f3ff] text-[#8b5cf6] flex items-center justify-center shrink-0">
+              <FileText className="w-4 h-4 sm:w-4.5 sm:h-4.5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-[11px] sm:text-xs font-bold text-slate-900 truncate">Record Fee</p>
+              <p className="text-[9px] sm:text-[10px] text-slate-400 truncate mt-0.5">Cash / UPI / Entry</p>
+            </div>
+            <ChevronRight className="w-3.5 h-3.5 text-slate-300 group-hover:text-indigo-600 group-hover:translate-x-0.5 transition-all shrink-0 hidden xs:block" />
+          </Link>
+
+          {/* Card 2: Upload Notes */}
+          <Link
+            href="/notes"
+            className="bg-white rounded-2xl p-2.5 sm:p-3.5 border border-slate-100 shadow-sm hover:border-emerald-100 hover:shadow-md transition-all flex items-center gap-2 sm:gap-3 group"
+          >
+            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-[#ecfdf5] text-[#10b981] flex items-center justify-center shrink-0">
+              <BookOpen className="w-4 h-4 sm:w-4.5 sm:h-4.5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-[11px] sm:text-xs font-bold text-slate-900 truncate">Upload Notes</p>
+              <p className="text-[9px] sm:text-[10px] text-slate-400 truncate mt-0.5">PDF & study guides</p>
+            </div>
+            <ChevronRight className="w-3.5 h-3.5 text-slate-300 group-hover:text-emerald-600 group-hover:translate-x-0.5 transition-all shrink-0 hidden xs:block" />
+          </Link>
+
+          {/* Card 3: Send Notice */}
+          <Link
+            href="/announcements"
+            className="bg-white rounded-2xl p-2.5 sm:p-3.5 border border-slate-100 shadow-sm hover:border-blue-100 hover:shadow-md transition-all flex items-center gap-2 sm:gap-3 group"
+          >
+            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-[#eff6ff] text-[#3b82f6] flex items-center justify-center shrink-0">
+              <Bell className="w-4 h-4 sm:w-4.5 sm:h-4.5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-[11px] sm:text-xs font-bold text-slate-900 truncate">Send Notice</p>
+              <p className="text-[9px] sm:text-[10px] text-slate-400 truncate mt-0.5">To school / class</p>
+            </div>
+            <ChevronRight className="w-3.5 h-3.5 text-slate-300 group-hover:text-blue-600 group-hover:translate-x-0.5 transition-all shrink-0 hidden xs:block" />
+          </Link>
+
+          {/* Card 4: Enter Marks */}
+          <Link
+            href="/exams"
+            className="bg-white rounded-2xl p-2.5 sm:p-3.5 border border-slate-100 shadow-sm hover:border-orange-100 hover:shadow-md transition-all flex items-center gap-2 sm:gap-3 group"
+          >
+            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-[#fff7ed] text-[#f97316] flex items-center justify-center shrink-0">
+              <FileText className="w-4 h-4 sm:w-4.5 sm:h-4.5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-[11px] sm:text-xs font-bold text-slate-900 truncate">Enter Marks</p>
+              <p className="text-[9px] sm:text-[10px] text-slate-400 truncate mt-0.5">Terminal / Unit tests</p>
+            </div>
+            <ChevronRight className="w-3.5 h-3.5 text-slate-300 group-hover:text-orange-600 group-hover:translate-x-0.5 transition-all shrink-0 hidden xs:block" />
+          </Link>
+
+          {/* Card 5: Online Zoom Class */}
+          <Link
+            href="/online-classes"
+            className="bg-white rounded-2xl p-2.5 sm:p-3.5 border border-slate-100 shadow-sm hover:border-rose-100 hover:shadow-md transition-all flex items-center gap-2 sm:gap-3 group"
+          >
+            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center shrink-0">
+              <Video className="w-4 h-4 sm:w-4.5 sm:h-4.5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-[11px] sm:text-xs font-bold text-slate-900 truncate">Zoom Live</p>
+              <p className="text-[9px] sm:text-[10px] text-slate-400 truncate mt-0.5">Host lecture session</p>
+            </div>
+            <ChevronRight className="w-3.5 h-3.5 text-slate-300 group-hover:text-rose-600 group-hover:translate-x-0.5 transition-all shrink-0 hidden xs:block" />
+          </Link>
+
+          {/* Card 6: Time Table */}
+          <Link
+            href="/timetable"
+            className="bg-white rounded-2xl p-2.5 sm:p-3.5 border border-slate-100 shadow-sm hover:border-indigo-100 hover:shadow-md transition-all flex items-center gap-2 sm:gap-3 group"
+          >
+            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-[#e0e7ff] text-[#4338ca] flex items-center justify-center shrink-0">
+              <Clock className="w-4 h-4 sm:w-4.5 sm:h-4.5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-[11px] sm:text-xs font-bold text-slate-900 truncate">Time Table</p>
+              <p className="text-[9px] sm:text-[10px] text-slate-400 truncate mt-0.5">Class schedule</p>
+            </div>
+            <ChevronRight className="w-3.5 h-3.5 text-slate-300 group-hover:text-indigo-600 group-hover:translate-x-0.5 transition-all shrink-0 hidden xs:block" />
+          </Link>
+        </div>
+      </div>
+
+      {/* 3. KPI Cards (2x2 Grid) */}
       <div className="grid grid-cols-2 gap-3 sm:gap-4">
         {/* Card 1: Total Students */}
         <Link
@@ -950,112 +1062,6 @@ export default function DashboardPage() {
             })}
           </div>
         )}
-      </div>
-
-      {/* 4. Quick Actions Section (3-Column Grid) */}
-      <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <h3 className="text-sm font-bold text-slate-900">Quick Actions</h3>
-          <Link
-            href="/classes"
-            className="text-xs font-bold text-[#4338ca] hover:underline flex items-center gap-1"
-          >
-            <span>View All</span>
-            <ArrowRight className="w-3.5 h-3.5" />
-          </Link>
-        </div>
-
-        <div className="grid grid-cols-3 gap-2 sm:gap-3">
-          {/* Card 1: Record Fee */}
-          <Link
-            href="/fees"
-            className="bg-white rounded-2xl p-2.5 sm:p-3.5 border border-slate-100 shadow-sm hover:border-indigo-100 hover:shadow-md transition-all flex items-center gap-2 sm:gap-3 group"
-          >
-            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-[#f5f3ff] text-[#8b5cf6] flex items-center justify-center shrink-0">
-              <FileText className="w-4 h-4 sm:w-4.5 sm:h-4.5" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-[11px] sm:text-xs font-bold text-slate-900 truncate">Record Fee</p>
-              <p className="text-[9px] sm:text-[10px] text-slate-400 truncate mt-0.5">Cash / UPI / Entry</p>
-            </div>
-            <ChevronRight className="w-3.5 h-3.5 text-slate-300 group-hover:text-indigo-600 group-hover:translate-x-0.5 transition-all shrink-0 hidden xs:block" />
-          </Link>
-
-          {/* Card 2: Upload Notes */}
-          <Link
-            href="/notes"
-            className="bg-white rounded-2xl p-2.5 sm:p-3.5 border border-slate-100 shadow-sm hover:border-emerald-100 hover:shadow-md transition-all flex items-center gap-2 sm:gap-3 group"
-          >
-            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-[#ecfdf5] text-[#10b981] flex items-center justify-center shrink-0">
-              <BookOpen className="w-4 h-4 sm:w-4.5 sm:h-4.5" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-[11px] sm:text-xs font-bold text-slate-900 truncate">Upload Notes</p>
-              <p className="text-[9px] sm:text-[10px] text-slate-400 truncate mt-0.5">PDF & study guides</p>
-            </div>
-            <ChevronRight className="w-3.5 h-3.5 text-slate-300 group-hover:text-emerald-600 group-hover:translate-x-0.5 transition-all shrink-0 hidden xs:block" />
-          </Link>
-
-          {/* Card 3: Send Notice */}
-          <Link
-            href="/announcements"
-            className="bg-white rounded-2xl p-2.5 sm:p-3.5 border border-slate-100 shadow-sm hover:border-blue-100 hover:shadow-md transition-all flex items-center gap-2 sm:gap-3 group"
-          >
-            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-[#eff6ff] text-[#3b82f6] flex items-center justify-center shrink-0">
-              <Bell className="w-4 h-4 sm:w-4.5 sm:h-4.5" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-[11px] sm:text-xs font-bold text-slate-900 truncate">Send Notice</p>
-              <p className="text-[9px] sm:text-[10px] text-slate-400 truncate mt-0.5">To school / class</p>
-            </div>
-            <ChevronRight className="w-3.5 h-3.5 text-slate-300 group-hover:text-blue-600 group-hover:translate-x-0.5 transition-all shrink-0 hidden xs:block" />
-          </Link>
-
-          {/* Card 4: Enter Marks */}
-          <Link
-            href="/exams"
-            className="bg-white rounded-2xl p-2.5 sm:p-3.5 border border-slate-100 shadow-sm hover:border-pink-100 hover:shadow-md transition-all flex items-center gap-2 sm:gap-3 group"
-          >
-            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-[#fdf2f8] text-[#ec4899] flex items-center justify-center shrink-0">
-              <GraduationCap className="w-4 h-4 sm:w-4.5 sm:h-4.5" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-[11px] sm:text-xs font-bold text-slate-900 truncate">Enter Marks</p>
-              <p className="text-[9px] sm:text-[10px] text-slate-400 truncate mt-0.5">Exams & report cards</p>
-            </div>
-            <ChevronRight className="w-3.5 h-3.5 text-slate-300 group-hover:text-pink-600 group-hover:translate-x-0.5 transition-all shrink-0 hidden xs:block" />
-          </Link>
-
-          {/* Card 5: Manage Classes */}
-          <Link
-            href="/classes"
-            className="bg-white rounded-2xl p-2.5 sm:p-3.5 border border-slate-100 shadow-sm hover:border-amber-100 hover:shadow-md transition-all flex items-center gap-2 sm:gap-3 group"
-          >
-            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-[#fffbeb] text-[#f59e0b] flex items-center justify-center shrink-0">
-              <Calendar className="w-4 h-4 sm:w-4.5 sm:h-4.5" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-[11px] sm:text-xs font-bold text-slate-900 truncate">Manage Classes</p>
-              <p className="text-[9px] sm:text-[10px] text-slate-400 truncate mt-0.5">Timetable & subjects</p>
-            </div>
-            <ChevronRight className="w-3.5 h-3.5 text-slate-300 group-hover:text-amber-600 group-hover:translate-x-0.5 transition-all shrink-0 hidden xs:block" />
-          </Link>
-
-          {/* Card 6: Student Records */}
-          <Link
-            href="/students"
-            className="bg-white rounded-2xl p-2.5 sm:p-3.5 border border-slate-100 shadow-sm hover:border-teal-100 hover:shadow-md transition-all flex items-center gap-2 sm:gap-3 group"
-          >
-            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-[#f0fdfa] text-[#14b8a6] flex items-center justify-center shrink-0">
-              <Users className="w-4 h-4 sm:w-4.5 sm:h-4.5" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-[11px] sm:text-xs font-bold text-slate-900 truncate">Student Records</p>
-              <p className="text-[9px] sm:text-[10px] text-slate-400 truncate mt-0.5">View & manage</p>
-            </div>
-            <ChevronRight className="w-3.5 h-3.5 text-slate-300 group-hover:text-teal-600 group-hover:translate-x-0.5 transition-all shrink-0 hidden xs:block" />
-          </Link>
-        </div>
       </div>
     </div>
   );

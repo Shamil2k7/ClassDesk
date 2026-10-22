@@ -18,6 +18,7 @@ import {
   Share2,
   Loader2,
   Users,
+  Calendar,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { generateFeeReceiptPdf } from '@/lib/pdf-generator';
@@ -312,12 +313,30 @@ export default function FeesPage() {
   };
 
   // -------------------------------------------------------------
-  // PARENT VIEW: Child's Pending Dues & Downloadable Receipts
+  // PARENT VIEW: Child's Pending Dues, Current Month Status & Downloadable Receipts
   // -------------------------------------------------------------
   if (!isStaff) {
-    const myDues = duesList.filter((d) => d.student_id === activeChild?.id);
-    const myPayments = paymentsList.filter((p) => p.student_id === activeChild?.id);
+    const targetStudent = activeChild || (studentsList.length > 0 ? studentsList[0] : null);
+    const targetStudentId = targetStudent?.id;
+
+    const myDues = duesList.filter((d) => d.student_id === targetStudentId);
+    const myPayments = paymentsList.filter((p) => p.student_id === targetStudentId);
     const pendingDue = myDues.find((d) => d.status === 'pending');
+
+    // Current Month calculations
+    const now = new Date();
+    const currentMonthName = now.toLocaleDateString('en-US', { month: 'long' });
+    const currentYear = now.getFullYear();
+    const currentMonthYearStr = `${currentMonthName} ${currentYear}`;
+    const currentMonthPrefix = `${currentYear}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+
+    const currentMonthPayment = myPayments.find(
+      (p) => p.paid_at && p.paid_at.startsWith(currentMonthPrefix)
+    );
+    const isCurrentMonthPaid =
+      !!currentMonthPayment ||
+      (myDues.length > 0 && myDues.every((d) => d.status === 'paid')) ||
+      (!pendingDue && myPayments.length > 0);
 
     return (
       <div className="space-y-5 animate-in fade-in duration-300">
@@ -327,10 +346,10 @@ export default function FeesPage() {
         <div className="bg-white rounded-3xl p-5 border border-slate-200 shadow-sm flex items-center justify-between">
           <div>
             <h2 className="text-base font-bold text-slate-900">
-              {activeChild?.full_name ? `${activeChild.full_name}'s Fee Portal` : 'Student Fee Portal'}
+              {targetStudent?.full_name ? `${targetStudent.full_name}'s Fee Portal` : 'Student Fee Portal'}
             </h2>
             <p className="text-xs text-slate-500">
-              Admission: {activeChild?.admission_number || 'N/A'} • Roll #{activeChild?.roll_number || 'N/A'}
+              Admission: {targetStudent?.admission_number || 'N/A'} • Roll #{targetStudent?.roll_number || 'N/A'}
             </p>
           </div>
           <div className="w-10 h-10 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold">
@@ -344,6 +363,99 @@ export default function FeesPage() {
             <p className="text-xs font-semibold text-emerald-900">{onlinePaySuccess}</p>
           </div>
         )}
+
+        {/* Dedicated Current Month Fee Status Card */}
+        <div className="bg-white rounded-3xl p-5 border border-slate-200 shadow-sm relative overflow-hidden">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-100">
+            <div className="flex items-center gap-3">
+              <div
+                className={`w-11 h-11 rounded-2xl flex items-center justify-center font-bold shrink-0 ${
+                  isCurrentMonthPaid ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'
+                }`}
+              >
+                <Calendar className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">
+                    CURRENT MONTH STATUS
+                  </span>
+                  <span
+                    className={`text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider ${
+                      isCurrentMonthPaid
+                        ? 'bg-emerald-100 text-emerald-800'
+                        : 'bg-amber-100 text-amber-800'
+                    }`}
+                  >
+                    {isCurrentMonthPaid ? '● PAID' : '● PENDING'}
+                  </span>
+                </div>
+                <h3 className="text-base font-black text-slate-900 mt-0.5">
+                  {currentMonthYearStr} Fee Status
+                </h3>
+              </div>
+            </div>
+
+            {isCurrentMonthPaid && currentMonthPayment && (
+              <button
+                onClick={() => {
+                  if (targetStudent) {
+                    generateFeeReceiptPdf({
+                      payment: currentMonthPayment,
+                      student: targetStudent,
+                      institute: institute || null,
+                    });
+                  }
+                }}
+                className="self-start sm:self-auto bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 px-3.5 py-2 rounded-xl text-xs font-bold inline-flex items-center gap-1.5 transition-all"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>Download Receipt (#{currentMonthPayment.receipt_number})</span>
+              </button>
+            )}
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 pt-4">
+            <div>
+              <p className="text-[11px] text-slate-400 font-medium">Billing Month</p>
+              <p className="text-xs sm:text-sm font-black text-slate-800 mt-0.5">{currentMonthYearStr}</p>
+            </div>
+            <div>
+              <p className="text-[11px] text-slate-400 font-medium">
+                {isCurrentMonthPaid ? 'Fee Amount Settled' : 'Payable Amount'}
+              </p>
+              <p
+                className={`text-xs sm:text-sm font-black mt-0.5 ${
+                  isCurrentMonthPaid ? 'text-emerald-700' : 'text-amber-700'
+                }`}
+              >
+                ₹
+                {isCurrentMonthPaid
+                  ? (currentMonthPayment?.amount || 2500).toLocaleString('en-IN')
+                  : (pendingDue
+                      ? pendingDue.original_amount - pendingDue.paid_amount
+                      : 2500
+                    ).toLocaleString('en-IN')}
+              </p>
+            </div>
+            <div className="col-span-2 sm:col-span-1">
+              <p className="text-[11px] text-slate-400 font-medium">
+                {isCurrentMonthPaid ? 'Date Paid' : 'Due Date'}
+              </p>
+              <p className="text-xs sm:text-sm font-bold text-slate-800 mt-0.5">
+                {isCurrentMonthPaid
+                  ? currentMonthPayment?.paid_at
+                    ? new Date(currentMonthPayment.paid_at).toLocaleDateString('en-IN', {
+                        day: 'numeric',
+                        month: 'short',
+                        year: 'numeric',
+                      })
+                    : `1st ${currentMonthName} ${currentYear}`
+                  : pendingDue?.due_date || `10th ${currentMonthName} ${currentYear}`}
+              </p>
+            </div>
+          </div>
+        </div>
 
         {/* Outstanding Due Card */}
         {pendingDue ? (
@@ -378,7 +490,7 @@ export default function FeesPage() {
             <CheckCircle2 className="w-10 h-10 text-emerald-600 mx-auto" />
             <h3 className="text-sm font-bold text-emerald-900">All Fees Cleared</h3>
             <p className="text-xs text-emerald-700">
-              There are no outstanding tuition fee dues for {activeChild?.full_name || 'your ward'}.
+              There are no outstanding tuition fee dues for {targetStudent?.full_name || 'your ward'}.
             </p>
           </div>
         )}
@@ -415,7 +527,7 @@ export default function FeesPage() {
                     </span>
                     <button
                       onClick={() => {
-                        const student = activeChild || studentsList.find((s) => s.id === pay.student_id);
+                        const student = targetStudent || studentsList.find((s) => s.id === pay.student_id);
                         if (student) {
                           generateFeeReceiptPdf({
                             payment: pay,
@@ -442,6 +554,23 @@ export default function FeesPage() {
   // -------------------------------------------------------------
   // STAFF VIEW: Institute Admin & Cashier Overview
   // -------------------------------------------------------------
+  const now = new Date();
+  const currentMonthName = now.toLocaleDateString('en-US', { month: 'long' });
+  const currentYear = now.getFullYear();
+  const currentMonthYearStr = `${currentMonthName} ${currentYear}`;
+  const currentMonthPrefix = `${currentYear}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+
+  const currentMonthCollected = paymentsList
+    .filter((p) => p.paid_at && p.paid_at.startsWith(currentMonthPrefix))
+    .reduce((acc, p) => acc + p.amount, 0);
+
+  const currentMonthDues = duesList.filter(
+    (d) => d.due_date && d.due_date.startsWith(currentMonthPrefix)
+  );
+  const currentMonthPending = currentMonthDues
+    .filter((d) => d.status !== 'paid')
+    .reduce((acc, d) => acc + (d.original_amount - d.paid_amount), 0);
+
   const totalCollected = paymentsList.reduce((acc, p) => acc + p.amount, 0);
   const totalPending = duesList
     .filter((d) => d.status !== 'paid')
@@ -463,11 +592,15 @@ export default function FeesPage() {
       {/* Header */}
       <div className="bg-white rounded-3xl p-5 border border-slate-200 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
+          <div className="inline-flex items-center gap-1.5 bg-indigo-50 text-indigo-700 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider mb-1">
+            <Calendar className="w-3 h-3 text-indigo-600" />
+            <span>Cycle: {currentMonthYearStr}</span>
+          </div>
           <h2 className="text-base sm:text-lg font-bold text-slate-900">
             {t('fees.title', 'Fee Management & Collections')}
           </h2>
           <p className="text-xs text-slate-500">
-            Cash / UPI recording, outstanding dues, and 1-tap PDF receipts
+            Cash / UPI recording, current month billing, and 1-tap PDF receipts
           </p>
         </div>
 
@@ -480,26 +613,52 @@ export default function FeesPage() {
         </button>
       </div>
 
-      {/* Collection Stats */}
-      <div className="grid grid-cols-2 gap-3 sm:gap-4">
-        <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-sm">
-          <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wide">
-            Total Collected
+      {/* Current Month & Overall Collection Stats */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+        <div className="bg-gradient-to-br from-emerald-500 to-emerald-700 text-white p-4 sm:p-5 rounded-3xl shadow-sm">
+          <span className="text-[10px] font-extrabold uppercase tracking-wider opacity-90 block">
+            {currentMonthName} Collected
           </span>
-          <p className="text-xl sm:text-2xl font-black text-emerald-600 mt-1">
-            ₹{totalCollected.toLocaleString('en-IN')}
+          <p className="text-xl sm:text-2xl font-black mt-1">
+            ₹{currentMonthCollected.toLocaleString('en-IN')}
           </p>
-          <span className="text-[10px] text-slate-400">{paymentsList.length} receipts generated</span>
+          <span className="text-[10px] text-emerald-100 mt-1 block">
+            This month&apos;s collections
+          </span>
         </div>
 
-        <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-sm">
-          <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wide">
-            Total Pending
+        <div className="bg-white p-4 sm:p-5 rounded-3xl border border-slate-200 shadow-sm">
+          <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider block">
+            {currentMonthName} Pending
           </span>
           <p className="text-xl sm:text-2xl font-black text-amber-600 mt-1">
+            ₹{(currentMonthPending > 0 ? currentMonthPending : totalPending).toLocaleString('en-IN')}
+          </p>
+          <span className="text-[10px] text-slate-400 mt-1 block">
+            Active dues for {currentMonthName}
+          </span>
+        </div>
+
+        <div className="bg-white p-4 sm:p-5 rounded-3xl border border-slate-200 shadow-sm">
+          <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider block">
+            Total All-Time Collected
+          </span>
+          <p className="text-xl sm:text-2xl font-black text-slate-900 mt-1">
+            ₹{totalCollected.toLocaleString('en-IN')}
+          </p>
+          <span className="text-[10px] text-slate-400 mt-1 block">
+            {paymentsList.length} total receipts
+          </span>
+        </div>
+
+        <div className="bg-white p-4 sm:p-5 rounded-3xl border border-slate-200 shadow-sm">
+          <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider block">
+            All Outstanding Dues
+          </span>
+          <p className="text-xl sm:text-2xl font-black text-rose-600 mt-1">
             ₹{totalPending.toLocaleString('en-IN')}
           </p>
-          <span className="text-[10px] text-slate-400">
+          <span className="text-[10px] text-slate-400 mt-1 block">
             {duesList.filter((d) => d.status !== 'paid').length} students with dues
           </span>
         </div>

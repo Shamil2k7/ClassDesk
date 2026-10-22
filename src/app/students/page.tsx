@@ -153,15 +153,38 @@ export default function StudentsPage() {
         .select()
         .single();
 
+      let savedStudent: Student = localStudent;
       if (data) {
-        setStudents(appendLocalData('students', data as Student, instId));
+        savedStudent = data as Student;
+        setStudents(appendLocalData('students', savedStudent, instId));
       } else {
         setStudents(appendLocalData('students', localStudent, instId));
-        setSchemaNotice(true);
       }
+
+      // Automatically set newly created student as active child
+      localStorage.setItem('classdesk_active_child', savedStudent.id);
+
+      // Create default current month tuition fee due so student fee section is immediately populated
+      const now = new Date();
+      const currentMonthName = now.toLocaleDateString('en-US', { month: 'long' });
+      const currentYear = now.getFullYear();
+      const dueDay = `${currentYear}-${String(now.getMonth() + 1).padStart(2, '0')}-10`;
+      const defaultFeeDue = {
+        id: `due-${savedStudent.id}-${Date.now()}`,
+        institute_id: effectiveInstId,
+        student_id: savedStudent.id,
+        title: `${currentMonthName} ${currentYear} Tuition Fee`,
+        original_amount: 2500,
+        paid_amount: 0,
+        due_date: dueDay,
+        status: 'pending' as const,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+      appendLocalData('feeDues', defaultFeeDue, effectiveInstId);
     } catch {
       setStudents(appendLocalData('students', localStudent, instId));
-      setSchemaNotice(true);
+      localStorage.setItem('classdesk_active_child', localStudent.id);
     }
 
     setShowAddModal(false);

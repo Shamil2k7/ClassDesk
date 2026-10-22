@@ -4,6 +4,8 @@ import React from 'react';
 import { useAuth } from '@/lib/auth-context';
 import { useTranslation } from '@/lib/i18n/context';
 import { Users, Check, ChevronDown } from 'lucide-react';
+import { getLocalData } from '@/lib/storage-helper';
+import { Student } from '@/types/app.types';
 
 interface ChildSwitcherProps {
   variant?: 'light' | 'dark';
@@ -18,8 +20,15 @@ export function ChildSwitcher({ variant = 'light' }: ChildSwitcherProps) {
     return null;
   }
 
-  const childName = activeChild?.full_name || 'shamil k';
-  const hasMultiple = linkedChildren && linkedChildren.length > 1;
+  const effectiveChildren =
+    linkedChildren && linkedChildren.length > 0
+      ? linkedChildren
+      : getLocalData<Student>('students');
+
+  const childName =
+    activeChild?.full_name ||
+    (effectiveChildren.length > 0 ? effectiveChildren[0].full_name : 'Active Student');
+  const hasMultiple = effectiveChildren && effectiveChildren.length > 1;
 
   const buttonClasses =
     variant === 'dark'
@@ -58,7 +67,7 @@ export function ChildSwitcher({ variant = 'light' }: ChildSwitcherProps) {
             </div>
 
             <div className="p-2 space-y-1">
-              {linkedChildren.map((child) => {
+              {effectiveChildren.map((child) => {
                 const isSelected = activeChild?.id === child.id;
                 return (
                   <button

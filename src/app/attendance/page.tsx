@@ -276,7 +276,9 @@ export default function AttendancePage() {
       const statusMap: Record<string, AttendanceStatus> = {};
       students.forEach((s) => {
         const existing = attList.find((a) => a.student_id === s.id);
-        statusMap[s.id] = (existing?.status as AttendanceStatus) || 'present';
+        if (existing?.status) {
+          statusMap[s.id] = existing.status as AttendanceStatus;
+        }
       });
 
       setAttendanceData(statusMap);
@@ -295,33 +297,42 @@ export default function AttendancePage() {
 
   // 3. Parent View: Load Attendance for Active Child
   useEffect(() => {
-    if (!isStaff && activeChild?.id) {
+    if (!isStaff) {
+      const targetStudent = activeChild || getLocalData<Student>('students')[0] || null;
+      if (!targetStudent?.id) return;
+
+      const studentId = targetStudent.id;
+      // Immediate local sync
+      const allLocalAtt = getLocalData<AttendanceRecord>('attendance');
+      const localMatches = allLocalAtt.filter((a) => a.student_id === studentId);
+      if (localMatches.length > 0) {
+        setParentAttendance(localMatches);
+      }
+
       async function fetchChildAttendance() {
         setLoading(true);
         try {
           let parentAttQuery = supabase
             .from('attendance')
             .select('*')
-            .eq('student_id', activeChild!.id);
+            .eq('student_id', studentId);
           if (instId) {
             parentAttQuery = parentAttQuery.eq('institute_id', instId);
           }
           const { data, error } = await parentAttQuery.order('date', { ascending: false });
 
-          if (error && (error.code === 'PGRST205' || error.code === '42P01')) {
-            setSchemaMissing(true);
-            const allLocalAtt = getLocalDataForInstitute<AttendanceRecord>('attendance', instId);
-            setParentAttendance(allLocalAtt.filter((a) => a.student_id === activeChild!.id));
-          } else if (data && data.length > 0) {
-            setParentAttendance(data as AttendanceRecord[]);
+          if (data && data.length > 0) {
+            // Merge remote records with local records
+            const merged = syncLocalWithRemote('attendance', data as AttendanceRecord[], instId);
+            setParentAttendance(merged.filter((a) => a.student_id === studentId));
           } else {
-            const allLocalAtt = getLocalDataForInstitute<AttendanceRecord>('attendance', instId);
-            setParentAttendance(allLocalAtt.filter((a) => a.student_id === activeChild!.id));
+            const currentLocal = getLocalData<AttendanceRecord>('attendance');
+            setParentAttendance(currentLocal.filter((a) => a.student_id === studentId));
           }
         } catch (err) {
           console.warn('Error fetching parent attendance:', err);
-          const allLocalAtt = getLocalDataForInstitute<AttendanceRecord>('attendance', instId);
-          setParentAttendance(allLocalAtt.filter((a) => a.student_id === activeChild!.id));
+          const currentLocal = getLocalData<AttendanceRecord>('attendance');
+          setParentAttendance(currentLocal.filter((a) => a.student_id === studentId));
         } finally {
           setLoading(false);
         }
@@ -383,13 +394,20 @@ export default function AttendancePage() {
       ? user.id
       : '698a39e4-3fca-48d4-9bbc-9838271336e5';
 
-    const records: AttendanceRecord[] = classStudents.map((s) => ({
+    const markedStudents = classStudents.filter((s) => !!attendanceData[s.id]);
+    if (markedStudents.length === 0) {
+      setAlertNotice('Please select P, A, or L for students or click "Mark All Present" first.');
+      setSaving(false);
+      return;
+    }
+
+    const records: AttendanceRecord[] = markedStudents.map((s) => ({
       id: `att-${s.id}-${selectedDate}`,
       institute_id: instId,
       class_id: selectedClassId,
       student_id: s.id,
       date: selectedDate,
-      status: attendanceData[s.id] || 'present',
+      status: attendanceData[s.id] as AttendanceStatus,
       marked_by: validMarkedBy,
       remarks: null,
       created_at: new Date().toISOString(),
@@ -397,9 +415,10 @@ export default function AttendancePage() {
     }));
 
     // Update local storage
+    const markedStudentIds = new Set(records.map((r) => r.student_id));
     const currentLocalAtt = getLocalData<AttendanceRecord>('attendance');
     const filteredCurrent = currentLocalAtt.filter(
-      (a) => !(a.class_id === selectedClassId && a.date === selectedDate)
+      (a) => !(markedStudentIds.has(a.student_id) && a.date === selectedDate)
     );
     saveLocalData('attendance', [...records, ...filteredCurrent]);
 
@@ -451,11 +470,18 @@ export default function AttendancePage() {
   // PARENT VIEW: Personal Student Attendance Calendar & Log
   // -------------------------------------------------------------
   if (!isStaff) {
+    const targetStudent = activeChild || getLocalData<Student>('students')[0] || null;
+    const targetStudentId = targetStudent?.id;
+
+    const effectiveParentAttendance = parentAttendance.length > 0
+      ? parentAttendance
+      : (targetStudentId ? getLocalData<AttendanceRecord>('attendance').filter((a) => a.student_id === targetStudentId) : []);
+
     const calendarDays = getMonthCalendarDays(currentYear, currentMonth);
     const monthPrefix = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}`;
 
     // Attendance stats for selected month
-    const monthAttendanceRecords = parentAttendance.filter((a) => a.date.startsWith(monthPrefix));
+    const monthAttendanceRecords = effectiveParentAttendance.filter((a) => a.date.startsWith(monthPrefix));
     const monthPresent = monthAttendanceRecords.filter((a) => a.status === 'present').length;
     const monthAbsent = monthAttendanceRecords.filter((a) => a.status === 'absent').length;
     const monthLate = monthAttendanceRecords.filter((a) => a.status === 'late').length;
@@ -466,17 +492,17 @@ export default function AttendancePage() {
         : 100;
 
     // Overall stats
-    const totalPresent = parentAttendance.filter((a) => a.status === 'present').length;
-    const totalAbsent = parentAttendance.filter((a) => a.status === 'absent').length;
-    const totalLate = parentAttendance.filter((a) => a.status === 'late').length;
-    const totalDaysRecorded = parentAttendance.length;
+    const totalPresent = effectiveParentAttendance.filter((a) => a.status === 'present').length;
+    const totalAbsent = effectiveParentAttendance.filter((a) => a.status === 'absent').length;
+    const totalLate = effectiveParentAttendance.filter((a) => a.status === 'late').length;
+    const totalDaysRecorded = effectiveParentAttendance.length;
     const overallPercentage =
       totalDaysRecorded > 0
         ? Math.round(((totalPresent + totalLate * 0.5) / totalDaysRecorded) * 100)
         : 100;
 
     // Selected Day inspection
-    const selectedRecord = parentAttendance.find((a) => a.date === selectedCalendarDate);
+    const selectedRecord = effectiveParentAttendance.find((a) => a.date === selectedCalendarDate);
     const selectedDateParts = selectedCalendarDate.split('-');
     const selectedDateObj =
       selectedDateParts.length === 3
@@ -496,7 +522,7 @@ export default function AttendancePage() {
       year: 'numeric',
     });
 
-    const studentDisplayName = activeChild?.full_name || user?.full_name || 'Student';
+    const studentDisplayName = targetStudent?.full_name || user?.full_name || 'Student';
 
     return (
       <div className="space-y-4 sm:space-y-5 animate-in fade-in duration-300">
@@ -652,7 +678,7 @@ export default function AttendancePage() {
               {/* Calendar Grid (7 columns) */}
               <div className="grid grid-cols-7 gap-1 sm:gap-2">
                 {calendarDays.map((day) => {
-                  const record = parentAttendance.find((a) => a.date === day.dateStr);
+                  const record = effectiveParentAttendance.find((a) => a.date === day.dateStr);
                   const isSelected = selectedCalendarDate === day.dateStr;
 
                   return (
@@ -813,7 +839,7 @@ export default function AttendancePage() {
           ) : (
             /* List Log View */
             <div className="space-y-2">
-              {parentAttendance.length === 0 ? (
+              {effectiveParentAttendance.length === 0 ? (
                 <div className="p-8 text-center text-slate-400">
                   <CalendarCheck className="w-8 h-8 mx-auto mb-2 opacity-40 text-slate-400" />
                   <p className="text-xs font-semibold text-slate-600">
@@ -824,7 +850,7 @@ export default function AttendancePage() {
                   </p>
                 </div>
               ) : (
-                parentAttendance.map((item) => (
+                effectiveParentAttendance.map((item) => (
                   <div
                     key={item.id}
                     className="p-3.5 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-between hover:border-indigo-100 transition-colors"
@@ -865,9 +891,10 @@ export default function AttendancePage() {
   // -------------------------------------------------------------
   // TEACHER / ADMIN 1-TAP ATTENDANCE MATRIX
   // -------------------------------------------------------------
-  const presentCount = displayedStudents.filter((s) => (attendanceData[s.id] || 'present') === 'present').length;
+  const presentCount = displayedStudents.filter((s) => attendanceData[s.id] === 'present').length;
   const absentCount = displayedStudents.filter((s) => attendanceData[s.id] === 'absent').length;
   const lateCount = displayedStudents.filter((s) => attendanceData[s.id] === 'late').length;
+  const unmarkedCount = displayedStudents.filter((s) => !attendanceData[s.id]).length;
 
   return (
     <div className="space-y-4 animate-in fade-in duration-300">
@@ -1035,7 +1062,7 @@ export default function AttendancePage() {
 
         {/* Attendance Counter Strip for Displayed Section */}
         {displayedStudents.length > 0 && (
-          <div className="grid grid-cols-3 gap-2 bg-slate-50 p-2.5 rounded-2xl text-center">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 bg-slate-50 p-2.5 rounded-2xl text-center">
             <div className="text-emerald-700 font-bold text-xs">
               Present: <span className="text-sm font-black">{presentCount}</span>
             </div>
@@ -1044,6 +1071,9 @@ export default function AttendancePage() {
             </div>
             <div className="text-amber-700 font-bold text-xs">
               Late: <span className="text-sm font-black">{lateCount}</span>
+            </div>
+            <div className="text-slate-500 font-bold text-xs">
+              Unmarked: <span className="text-sm font-black">{unmarkedCount}</span>
             </div>
           </div>
         )}
@@ -1100,7 +1130,7 @@ export default function AttendancePage() {
       ) : (
         <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden divide-y divide-slate-100">
           {displayedStudents.map((student) => {
-            const currentStatus = attendanceData[student.id] || 'present';
+            const currentStatus = attendanceData[student.id];
             const studentSec = (student as any).section || currentClassObj?.section || 'A';
 
             return (
@@ -1121,6 +1151,23 @@ export default function AttendancePage() {
                       <span className="text-[10px] font-black px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 uppercase shrink-0">
                         Sec {studentSec}
                       </span>
+                      {currentStatus ? (
+                        <span
+                          className={`text-[9px] font-extrabold px-1.5 py-0.2 rounded uppercase ${
+                            currentStatus === 'present'
+                              ? 'bg-emerald-100 text-emerald-800'
+                              : currentStatus === 'absent'
+                              ? 'bg-rose-100 text-rose-800'
+                              : 'bg-amber-100 text-amber-800'
+                          }`}
+                        >
+                          {currentStatus}
+                        </span>
+                      ) : (
+                        <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-slate-100 text-slate-400 uppercase">
+                          Unmarked
+                        </span>
+                      )}
                     </div>
                     <p className="text-[10px] text-slate-400 truncate">
                       Parent: {student.parent_name || 'Guardian'} ({student.parent_phone})
@@ -1133,10 +1180,10 @@ export default function AttendancePage() {
                   <button
                     type="button"
                     onClick={() => setStudentStatus(student.id, 'present')}
-                    className={`w-9 h-9 sm:w-11 sm:h-10 rounded-xl text-xs font-black transition-all active:scale-90 flex items-center justify-center ${
+                    className={`w-9 h-9 sm:w-11 sm:h-10 rounded-xl text-xs transition-all active:scale-90 flex items-center justify-center ${
                       currentStatus === 'present'
-                        ? 'bg-emerald-600 text-white shadow-sm'
-                        : 'text-slate-500 hover:text-slate-900'
+                        ? 'bg-emerald-600 text-white font-black shadow-sm ring-2 ring-emerald-600/30'
+                        : 'text-slate-500 hover:text-emerald-700 hover:bg-emerald-50/70 font-bold'
                     }`}
                     aria-label="Mark Present"
                   >
@@ -1145,10 +1192,10 @@ export default function AttendancePage() {
                   <button
                     type="button"
                     onClick={() => setStudentStatus(student.id, 'absent')}
-                    className={`w-9 h-9 sm:w-11 sm:h-10 rounded-xl text-xs font-black transition-all active:scale-90 flex items-center justify-center ${
+                    className={`w-9 h-9 sm:w-11 sm:h-10 rounded-xl text-xs transition-all active:scale-90 flex items-center justify-center ${
                       currentStatus === 'absent'
-                        ? 'bg-rose-600 text-white shadow-sm'
-                        : 'text-slate-500 hover:text-slate-900'
+                        ? 'bg-rose-600 text-white font-black shadow-sm ring-2 ring-rose-600/30'
+                        : 'text-slate-500 hover:text-rose-700 hover:bg-rose-50/70 font-bold'
                     }`}
                     aria-label="Mark Absent"
                   >
@@ -1157,10 +1204,10 @@ export default function AttendancePage() {
                   <button
                     type="button"
                     onClick={() => setStudentStatus(student.id, 'late')}
-                    className={`w-9 h-9 sm:w-11 sm:h-10 rounded-xl text-xs font-black transition-all active:scale-90 flex items-center justify-center ${
+                    className={`w-9 h-9 sm:w-11 sm:h-10 rounded-xl text-xs transition-all active:scale-90 flex items-center justify-center ${
                       currentStatus === 'late'
-                        ? 'bg-amber-500 text-white shadow-sm'
-                        : 'text-slate-500 hover:text-slate-900'
+                        ? 'bg-amber-500 text-white font-black shadow-sm ring-2 ring-amber-500/30'
+                        : 'text-slate-500 hover:text-amber-700 hover:bg-amber-50/70 font-bold'
                     }`}
                     aria-label="Mark Late"
                   >

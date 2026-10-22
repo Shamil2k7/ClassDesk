@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/lib/auth-context';
 import { useTranslation } from '@/lib/i18n/context';
@@ -27,7 +27,6 @@ import {
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { OnlineClass, Subject, ClassBatch, UserProfile } from '@/types/app.types';
-import { SchemaNotice } from '@/components/common/schema-notice';
 import {
   getLocalDataForInstitute,
   saveLocalData,
@@ -132,7 +131,7 @@ function getInitialSeedOnlineClasses(targetInstId: string, classBatchId?: string
 export default function OnlineClassesPage() {
   const { user, institute, activeChild, loading: authLoading } = useAuth();
   const { t } = useTranslation();
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
   const instId = institute?.id || user?.institute_id || null;
 
   const isStaff =
@@ -150,7 +149,6 @@ export default function OnlineClassesPage() {
   const [activeTab, setActiveTab] = useState<'all' | 'live' | 'upcoming' | 'completed'>('all');
 
   const [loading, setLoading] = useState(false);
-  const [schemaMissing, setSchemaMissing] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [actionNotice, setActionNotice] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
@@ -194,26 +192,27 @@ export default function OnlineClassesPage() {
     }
 
     setLoading(true);
-    let isSchemaMissing = false;
+    let resolvedClassId = '00000000-0000-0000-0000-000000000002';
 
     try {
       // 1. Classes
       try {
         let q = supabase.from('classes').select('*').order('name');
         if (instId) q = q.eq('institute_id', instId);
-        const { data, error } = await q;
-        if (error && (error.code === 'PGRST205' || error.code === '42P01')) {
-          isSchemaMissing = true;
-          setSchemaMissing(true);
-        } else if (data && data.length > 0) {
-          setClassesList(syncLocalWithRemote('classes', data as ClassBatch[]));
+        const { data } = await q;
+        if (data && data.length > 0) {
+          const synced = syncLocalWithRemote('classes', data as ClassBatch[]);
+          setClassesList(synced);
+          if (synced[0]?.id) resolvedClassId = synced[0].id;
         } else {
-          setClassesList(getLocalDataForInstitute<ClassBatch>('classes', instId));
+          const local = getLocalDataForInstitute<ClassBatch>('classes', instId);
+          setClassesList(local);
+          if (local[0]?.id) resolvedClassId = local[0].id;
         }
       } catch {
-        isSchemaMissing = true;
-        setSchemaMissing(true);
-        setClassesList(getLocalDataForInstitute<ClassBatch>('classes', instId));
+        const local = getLocalDataForInstitute<ClassBatch>('classes', instId);
+        setClassesList(local);
+        if (local[0]?.id) resolvedClassId = local[0].id;
       }
 
       // 2. Subjects
@@ -249,34 +248,24 @@ export default function OnlineClassesPage() {
         let q = (supabase as any).from('online_classes').select('*').order('date', { ascending: false });
         if (instId) q = q.eq('institute_id', instId);
         const { data, error } = await q;
-        if (error && (error.code === 'PGRST205' || error.code === '42P01')) {
-          setSchemaMissing(true);
+        if (error || !data || data.length === 0) {
           const local = getLocalDataForInstitute<OnlineClass>('onlineClasses', instId);
           if (local.length > 0) {
             setOnlineClasses(local);
           } else {
-            const seeded = getInitialSeedOnlineClasses(instId || 'default-inst', classesList[0]?.id);
+            const seeded = getInitialSeedOnlineClasses(instId || 'default-inst', resolvedClassId);
             setOnlineClasses(seeded);
             saveLocalData('onlineClasses', seeded);
           }
-        } else if (data && data.length > 0) {
-          setOnlineClasses(syncLocalWithRemote('onlineClasses', data as OnlineClass[], instId));
         } else {
-          const local = getLocalDataForInstitute<OnlineClass>('onlineClasses', instId);
-          if (local.length > 0) {
-            setOnlineClasses(local);
-          } else {
-            const seeded = getInitialSeedOnlineClasses(instId || 'default-inst', classesList[0]?.id);
-            setOnlineClasses(seeded);
-            saveLocalData('onlineClasses', seeded);
-          }
+          setOnlineClasses(syncLocalWithRemote('onlineClasses', data as OnlineClass[], instId));
         }
       } catch {
         const local = getLocalDataForInstitute<OnlineClass>('onlineClasses', instId);
         if (local.length > 0) {
           setOnlineClasses(local);
         } else {
-          const seeded = getInitialSeedOnlineClasses(instId || 'default-inst', classesList[0]?.id);
+          const seeded = getInitialSeedOnlineClasses(instId || 'default-inst', resolvedClassId);
           setOnlineClasses(seeded);
           saveLocalData('onlineClasses', seeded);
         }
@@ -284,7 +273,7 @@ export default function OnlineClassesPage() {
     } finally {
       setLoading(false);
     }
-  }, [supabase, instId, user?.role, classesList]);
+  }, [supabase, instId, user?.role]);
 
   useEffect(() => {
     fetchData();
@@ -549,7 +538,6 @@ export default function OnlineClassesPage() {
 
   return (
     <div className="space-y-5 animate-in fade-in duration-300">
-      <SchemaNotice visible={schemaMissing} />
 
       {/* Action Notice Toast */}
       {actionNotice && (
