@@ -158,7 +158,7 @@ export default function DashboardPage() {
   }, [authLoading, isAuthenticated, router]);
 
   const role = user?.role || 'parent';
-  const instId = institute?.id || user?.institute_id || null;
+  const instId = role !== 'super_admin' && user?.institute_id ? user.institute_id : institute?.id || user?.institute_id || null;
 
   const {
     institutes,
@@ -295,7 +295,16 @@ export default function DashboardPage() {
   // -------------------------------------------------------------
   if (role === 'parent') {
     const todayStr = new Date().toISOString().split('T')[0];
-    const effectiveStudent = activeChild || (students && students.length > 0 ? students[0] : null);
+    const cleanPhone = user?.phone ? user.phone.replace(/\D/g, '').slice(-10) : '';
+    const effectiveStudent =
+      activeChild ||
+      (cleanPhone
+        ? students.find((s) => s.parent_phone && s.parent_phone.replace(/\D/g, '').slice(-10) === cleanPhone)
+        : null) ||
+      (user?.id ? students.find((s) => s.id === user.id) : null) ||
+      (students.length > 0
+        ? (instId ? students.find((s) => s.institute_id === instId) || null : students[0])
+        : null);
     const effectiveStudentId = effectiveStudent?.id;
 
     const todayAttendance = attendance.find(
@@ -731,9 +740,10 @@ export default function DashboardPage() {
   // -------------------------------------------------------------
   // 3. INSTITUTE ADMIN & TEACHER DASHBOARD (Matches User Screenshot)
   // -------------------------------------------------------------
-  const totalStudents = students.length;
+  const instituteStudents = instId ? students.filter((s) => s.institute_id === instId) : students;
+  const totalStudents = instituteStudents.length;
   const todayStr = new Date().toISOString().split('T')[0];
-  const todayRecords = attendance.filter((a) => a.date === todayStr);
+  const todayRecords = attendance.filter((a) => (!instId || a.institute_id === instId) && a.date === todayStr);
   const todayPresent = todayRecords.filter((a) => a.status === 'present').length;
   const totalStudentsOrDummy = totalStudents > 0 ? totalStudents : 1;
   const todayAttendanceRate =
@@ -742,10 +752,11 @@ export default function DashboardPage() {
       : '93%';
 
   const pendingFeeTotal = feeDues
-    .filter((d) => d.status !== 'paid')
+    .filter((d) => (!instId || d.institute_id === instId) && d.status !== 'paid')
     .reduce((acc, d) => acc + (d.original_amount - d.paid_amount), 0);
 
-  const activeTeachersCount = teachers.length;
+  const instituteTeachers = instId ? teachers.filter((t) => t.institute_id === instId) : teachers;
+  const activeTeachersCount = instituteTeachers.length;
 
   const todayDay = new Date().getDay();
   const currentDayOfWeek = todayDay === 0 ? 7 : todayDay; // 1 = Mon ... 7 = Sun

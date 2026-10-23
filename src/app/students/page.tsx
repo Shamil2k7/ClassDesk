@@ -49,17 +49,32 @@ export default function StudentsPage() {
 
   const loadData = React.useCallback(async () => {
     try {
-      let stuQuery = supabase.from('students').select('*');
-      if (instId) {
-        stuQuery = stuQuery.eq('institute_id', instId);
+      let stuData: Student[] | null = null;
+      try {
+        const apiRes = await fetch(`/api/students${instId ? `?institute_id=${instId}` : ''}`);
+        const apiJson = await apiRes.json();
+        if (apiJson?.success && Array.isArray(apiJson.students)) {
+          stuData = apiJson.students;
+        }
+      } catch {
+        // fallback to supabase
       }
-      const { data: stuData, error: stuError } = await stuQuery.order('roll_number');
 
-      if (stuError && (stuError.code === 'PGRST205' || stuError.code === '42P01')) {
-        setSchemaNotice(true);
-        setStudents(getLocalDataForInstitute<Student>('students', instId));
-      } else if (stuData) {
-        setStudents(syncLocalWithRemote('students', stuData as Student[], instId));
+      if (!stuData) {
+        let stuQuery = supabase.from('students').select('*');
+        if (instId) {
+          stuQuery = stuQuery.eq('institute_id', instId);
+        }
+        const { data, error: stuError } = await stuQuery.order('roll_number');
+        if (stuError && (stuError.code === 'PGRST205' || stuError.code === '42P01')) {
+          setSchemaNotice(true);
+        } else if (data) {
+          stuData = data as Student[];
+        }
+      }
+
+      if (stuData && stuData.length > 0) {
+        setStudents(syncLocalWithRemote('students', stuData, instId));
       } else {
         setStudents(getLocalDataForInstitute<Student>('students', instId));
       }
@@ -136,33 +151,55 @@ export default function StudentsPage() {
     };
 
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data, error } = await (supabase as any)
-        .from('students')
-        .insert({
-          institute_id: effectiveInstId,
-          class_id: targetClassId,
-          full_name: fullName,
-          roll_number: rollNumber,
-          admission_number: localStudent.admission_number,
-          parent_name: parentName,
-          parent_phone: formattedPhone,
-          address,
-          is_active: true,
-        })
-        .select()
-        .single();
-
       let savedStudent: Student = localStudent;
-      if (data) {
-        savedStudent = data as Student;
-        setStudents(appendLocalData('students', savedStudent, instId));
-      } else {
-        setStudents(appendLocalData('students', localStudent, instId));
+      try {
+        const apiRes = await fetch('/api/students', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id: localStudent.id,
+            institute_id: effectiveInstId,
+            class_id: targetClassId,
+            full_name: fullName,
+            roll_number: rollNumber,
+            admission_number: localStudent.admission_number,
+            parent_name: parentName,
+            parent_phone: formattedPhone,
+            address,
+            is_active: true,
+          }),
+        });
+        const apiJson = await apiRes.json();
+        if (apiJson?.success && apiJson.student) {
+          savedStudent = apiJson.student as Student;
+        }
+      } catch {
+        // Fallback to client-side supabase
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { data } = await (supabase as any)
+          .from('students')
+          .insert({
+            institute_id: effectiveInstId,
+            class_id: targetClassId,
+            full_name: fullName,
+            roll_number: rollNumber,
+            admission_number: localStudent.admission_number,
+            parent_name: parentName,
+            parent_phone: formattedPhone,
+            address,
+            is_active: true,
+          })
+          .select()
+          .single();
+        if (data) savedStudent = data as Student;
       }
 
-      // Automatically set newly created student as active child
-      localStorage.setItem('classdesk_active_child', savedStudent.id);
+      setStudents(appendLocalData('students', savedStudent, instId));
+
+      // Only set active child if current session is parent
+      if (user?.role === 'parent') {
+        localStorage.setItem('classdesk_active_child', savedStudent.id);
+      }
 
       // Create default current month tuition fee due so student fee section is immediately populated
       const now = new Date();
@@ -225,13 +262,22 @@ export default function StudentsPage() {
     };
 
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await (supabase as any)
-        .from('students')
-        .update(updates)
-        .eq('id', editingStudent.id);
-    } catch (err) {
-      console.warn('Update remote student warning:', err);
+      const apiRes = await fetch('/api/students', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: editingStudent.id, ...updates }),
+      });
+      if (!apiRes.ok) throw new Error('API update failed');
+    } catch {
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await (supabase as any)
+          .from('students')
+          .update(updates)
+          .eq('id', editingStudent.id);
+      } catch (err) {
+        console.warn('Update remote student warning:', err);
+      }
     }
 
     setStudents(updateLocalData<Student>('students', editingStudent.id, updates, instId));
@@ -244,13 +290,20 @@ export default function StudentsPage() {
     }
 
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await (supabase as any)
-        .from('students')
-        .delete()
-        .eq('id', id);
-    } catch (err) {
-      console.warn('Delete remote student warning:', err);
+      const apiRes = await fetch(`/api/students?id=${id}`, {
+        method: 'DELETE',
+      });
+      if (!apiRes.ok) throw new Error('API delete failed');
+    } catch {
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await (supabase as any)
+          .from('students')
+          .delete()
+          .eq('id', id);
+      } catch (err) {
+        console.warn('Delete remote student warning:', err);
+      }
     }
 
     setStudents(removeLocalData<Student>('students', id, instId));

@@ -87,7 +87,7 @@ export async function POST(request: Request) {
         id: `usr-parent-${cleanPhone}`,
         institute_id: students[0].institute_id,
         role: 'parent',
-        full_name: students[0].parent_name || 'Student Parent',
+        full_name: students[0].full_name || students[0].parent_name || 'Student Parent',
         phone: formattedPhone,
         email: students[0].parent_email || null,
         avatar_url: null,

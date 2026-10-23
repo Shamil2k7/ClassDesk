@@ -131,9 +131,24 @@ export function useSupabaseData(instituteId?: string | null) {
 
       // 3. Fetch Students (Multi-tenant isolated)
       try {
-        let studentQuery = supabase.from('students').select('*');
-        if (instituteId) studentQuery = studentQuery.eq('institute_id', instituteId);
-        const { data: stuData } = await studentQuery.order('roll_number');
+        let stuData: Student[] | null = null;
+        try {
+          const apiRes = await fetch(`/api/students${instituteId ? `?institute_id=${instituteId}` : ''}`);
+          const apiJson = await apiRes.json();
+          if (apiJson?.students && Array.isArray(apiJson.students)) {
+            stuData = apiJson.students;
+          }
+        } catch {
+          // fallback to supabase
+        }
+
+        if (!stuData) {
+          let studentQuery = supabase.from('students').select('*');
+          if (instituteId) studentQuery = studentQuery.eq('institute_id', instituteId);
+          const { data } = await studentQuery.order('roll_number');
+          stuData = data as Student[];
+        }
+
         if (stuData && stuData.length > 0) {
           setStudents(syncLocalWithRemote('students', stuData as Student[], instituteId));
         } else {
@@ -363,7 +378,7 @@ export function useSupabaseData(instituteId?: string | null) {
         }
         const { data: ocData } = await ocQuery;
         if (ocData && ocData.length > 0) {
-          setOnlineClasses(syncLocalWithRemote('onlineClasses', ocData as OnlineClass[]));
+          setOnlineClasses(syncLocalWithRemote('onlineClasses', ocData as OnlineClass[], instituteId));
         } else {
           setOnlineClasses(getLocalDataForInstitute<OnlineClass>('onlineClasses', instituteId));
         }

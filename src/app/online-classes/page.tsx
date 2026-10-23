@@ -201,7 +201,7 @@ export default function OnlineClassesPage() {
         if (instId) q = q.eq('institute_id', instId);
         const { data } = await q;
         if (data && data.length > 0) {
-          const synced = syncLocalWithRemote('classes', data as ClassBatch[]);
+          const synced = syncLocalWithRemote('classes', data as ClassBatch[], instId);
           setClassesList(synced);
           if (synced[0]?.id) resolvedClassId = synced[0].id;
         } else {
@@ -221,7 +221,7 @@ export default function OnlineClassesPage() {
         if (instId) q = q.eq('institute_id', instId);
         const { data } = await q;
         if (data && data.length > 0) {
-          setSubjectsList(syncLocalWithRemote('subjects', data as Subject[]));
+          setSubjectsList(syncLocalWithRemote('subjects', data as Subject[], instId));
         } else {
           setSubjectsList(getLocalDataForInstitute<Subject>('subjects', instId));
         }
@@ -235,7 +235,7 @@ export default function OnlineClassesPage() {
         if (instId) q = q.eq('institute_id', instId);
         const { data } = await q;
         if (data && data.length > 0) {
-          setTeachersList(syncLocalWithRemote('teachers', data as UserProfile[]));
+          setTeachersList(syncLocalWithRemote('teachers', data as UserProfile[], instId));
         } else {
           setTeachersList(getLocalDataForInstitute<UserProfile>('teachers', instId));
         }
@@ -250,25 +250,13 @@ export default function OnlineClassesPage() {
         const { data, error } = await q;
         if (error || !data || data.length === 0) {
           const local = getLocalDataForInstitute<OnlineClass>('onlineClasses', instId);
-          if (local.length > 0) {
-            setOnlineClasses(local);
-          } else {
-            const seeded = getInitialSeedOnlineClasses(instId || 'default-inst', resolvedClassId);
-            setOnlineClasses(seeded);
-            saveLocalData('onlineClasses', seeded);
-          }
+          setOnlineClasses(local);
         } else {
           setOnlineClasses(syncLocalWithRemote('onlineClasses', data as OnlineClass[], instId));
         }
       } catch {
         const local = getLocalDataForInstitute<OnlineClass>('onlineClasses', instId);
-        if (local.length > 0) {
-          setOnlineClasses(local);
-        } else {
-          const seeded = getInitialSeedOnlineClasses(instId || 'default-inst', resolvedClassId);
-          setOnlineClasses(seeded);
-          saveLocalData('onlineClasses', seeded);
-        }
+        setOnlineClasses(local);
       }
     } finally {
       setLoading(false);
@@ -349,10 +337,11 @@ export default function OnlineClassesPage() {
 
     const teacherObj = teachersList.find((t) => t.id === teacherId);
     const teacherName = teacherObj?.full_name || user?.full_name || 'Teacher';
+    const effectiveInstId = instId || institute?.id || user?.institute_id || '00000000-0000-0000-0000-000000000001';
 
     const newClass: OnlineClass = {
       id: crypto.randomUUID(),
-      institute_id: instId || 'default-inst',
+      institute_id: effectiveInstId,
       class_id: classId,
       subject_id: subjectId || (availableSubjectsForAdd[0]?.id || ''),
       teacher_id: teacherId || user?.id || null,
@@ -378,7 +367,7 @@ export default function OnlineClassesPage() {
       }
 
       // 2. Local Storage
-      appendLocalData('onlineClasses', newClass, instId);
+      appendLocalData('onlineClasses', newClass, effectiveInstId);
       setOnlineClasses((prev) => [newClass, ...prev]);
 
       // Reset form
@@ -707,16 +696,41 @@ export default function OnlineClassesPage() {
               </p>
             </div>
           </div>
-          <a
-            href={liveClassesList[0].zoom_url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="bg-white hover:bg-rose-50 text-rose-700 px-6 py-3.5 rounded-2xl text-xs font-black shadow-lg flex items-center justify-center gap-2 active:scale-95 transition-all shrink-0 min-h-[44px]"
-          >
-            <Video className="w-4 h-4 text-rose-600" />
-            <span>Join Live Room (1-Tap)</span>
-            <ExternalLink className="w-3.5 h-3.5" />
-          </a>
+          <div className="flex items-center gap-2 flex-wrap">
+            <a
+              href={liveClassesList[0].zoom_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="bg-white hover:bg-rose-50 text-rose-700 px-5 sm:px-6 py-3.5 rounded-2xl text-xs font-black shadow-lg flex items-center justify-center gap-2 active:scale-95 transition-all shrink-0 min-h-[44px]"
+            >
+              <Video className="w-4 h-4 text-rose-600" />
+              <span>Join Live Room (1-Tap)</span>
+              <ExternalLink className="w-3.5 h-3.5" />
+            </a>
+
+            {isStaff && (
+              <div className="flex items-center gap-1.5 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => handleStartEdit(liveClassesList[0])}
+                  className="bg-white/20 hover:bg-white/30 text-white px-3.5 py-3 rounded-2xl text-xs font-bold flex items-center gap-1.5 transition-all active:scale-95 border border-white/20 shadow-sm"
+                  title="Edit this Zoom class"
+                >
+                  <Pencil className="w-3.5 h-3.5" />
+                  <span>Edit</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleDelete(liveClassesList[0].id, liveClassesList[0].title)}
+                  className="bg-rose-950/40 hover:bg-rose-950/70 text-rose-100 hover:text-white px-3.5 py-3 rounded-2xl text-xs font-bold flex items-center gap-1.5 transition-all active:scale-95 border border-rose-300/30 shadow-sm"
+                  title="Cancel and delete this Zoom class"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>Delete</span>
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
@@ -788,20 +802,45 @@ export default function OnlineClassesPage() {
                       )}
                     </div>
 
-                    {isLive ? (
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-black bg-rose-50 text-rose-600 border border-rose-200 animate-pulse">
-                        <span className="w-2 h-2 rounded-full bg-rose-500" />
-                        <span>LIVE NOW</span>
-                      </span>
-                    ) : item.status === 'completed' ? (
-                      <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-slate-100 text-slate-500">
-                        Ended
-                      </span>
-                    ) : (
-                      <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700">
-                        Scheduled
-                      </span>
-                    )}
+                    <div className="flex items-center gap-2">
+                      {isLive ? (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-black bg-rose-50 text-rose-600 border border-rose-200 animate-pulse">
+                          <span className="w-2 h-2 rounded-full bg-rose-500" />
+                          <span>LIVE NOW</span>
+                        </span>
+                      ) : item.status === 'completed' ? (
+                        <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-slate-100 text-slate-500">
+                          Ended
+                        </span>
+                      ) : (
+                        <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700">
+                          Scheduled
+                        </span>
+                      )}
+
+                      {isStaff && (
+                        <div className="flex items-center gap-1 pl-1 border-l border-slate-200">
+                          <button
+                            type="button"
+                            onClick={() => handleStartEdit(item)}
+                            className="w-7 h-7 rounded-lg bg-slate-100 hover:bg-indigo-50 hover:text-indigo-600 text-slate-500 flex items-center justify-center transition-all"
+                            title="Edit Zoom Class"
+                            aria-label="Edit Zoom Class"
+                          >
+                            <Pencil className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDelete(item.id, item.title)}
+                            className="w-7 h-7 rounded-lg bg-slate-100 hover:bg-rose-50 hover:text-rose-600 text-slate-500 flex items-center justify-center transition-all"
+                            title="Delete Zoom Class"
+                            aria-label="Delete Zoom Class"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </div>
 
                   {/* Title & Description */}
@@ -883,6 +922,32 @@ export default function OnlineClassesPage() {
                       <ExternalLink className="w-3.5 h-3.5 opacity-80" />
                     </a>
 
+                    {/* Staff Edit Button */}
+                    {isStaff && (
+                      <button
+                        type="button"
+                        onClick={() => handleStartEdit(item)}
+                        className="px-3.5 py-3 rounded-2xl border border-indigo-200 bg-indigo-50/70 hover:bg-indigo-100 text-[#4338ca] text-xs font-bold inline-flex items-center gap-1.5 active:scale-95 transition-all shadow-sm"
+                        title="Edit Zoom Class"
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
+                        <span className="hidden sm:inline">Edit</span>
+                      </button>
+                    )}
+
+                    {/* Staff Delete Button */}
+                    {isStaff && (
+                      <button
+                        type="button"
+                        onClick={() => handleDelete(item.id, item.title)}
+                        className="px-3.5 py-3 rounded-2xl border border-rose-200 bg-rose-50/70 hover:bg-rose-100 text-rose-700 text-xs font-bold inline-flex items-center gap-1.5 active:scale-95 transition-all shadow-sm"
+                        title="Delete Zoom Class"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span className="hidden sm:inline">Delete</span>
+                      </button>
+                    )}
+
                     {/* Copy Link Button */}
                     <button
                       onClick={() => handleCopy(item)}
@@ -898,7 +963,7 @@ export default function OnlineClassesPage() {
                     </button>
                   </div>
 
-                  {/* Staff Host Controls: Toggle Live Status & Edit / Delete */}
+                  {/* Staff Host Controls: Toggle Live Status & Edit / Delete shortcuts */}
                   {isStaff && (
                     <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-100 text-[11px] font-semibold text-slate-500">
                       <div className="flex items-center gap-1.5">
@@ -910,7 +975,7 @@ export default function OnlineClassesPage() {
                             title="Set to Live status"
                           >
                             <Radio className="w-3 h-3" />
-                            <span>Set Live</span>
+                            <span>Mark Live Now</span>
                           </button>
                         ) : (
                           <button
@@ -925,20 +990,23 @@ export default function OnlineClassesPage() {
                         )}
                       </div>
 
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-2">
                         <button
+                          type="button"
                           onClick={() => handleStartEdit(item)}
-                          className="hover:text-indigo-600 flex items-center gap-1 transition-colors"
+                          className="hover:text-indigo-600 text-indigo-700 font-bold flex items-center gap-1 transition-colors"
                         >
                           <Pencil className="w-3 h-3" />
-                          <span>Edit</span>
+                          <span>Edit Class</span>
                         </button>
+                        <span className="text-slate-300">•</span>
                         <button
+                          type="button"
                           onClick={() => handleDelete(item.id, item.title)}
-                          className="hover:text-rose-600 flex items-center gap-1 transition-colors"
+                          className="hover:text-rose-600 text-rose-600 font-bold flex items-center gap-1 transition-colors"
                         >
                           <Trash2 className="w-3 h-3" />
-                          <span>Delete</span>
+                          <span>Delete Class</span>
                         </button>
                       </div>
                     </div>
@@ -1386,23 +1454,40 @@ export default function OnlineClassesPage() {
                 />
               </div>
 
-              {/* Submit Buttons */}
-              <div className="pt-2 flex items-center justify-end gap-2">
+              {/* Submit & Delete Buttons */}
+              <div className="pt-3 border-t border-slate-100 flex items-center justify-between gap-2 flex-wrap">
                 <button
                   type="button"
-                  onClick={() => setEditingClass(null)}
-                  className="px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100"
+                  onClick={() => {
+                    const id = editingClass.id;
+                    const classTitle = editingClass.title;
+                    setEditingClass(null);
+                    handleDelete(id, classTitle);
+                  }}
+                  className="px-3.5 py-2.5 rounded-xl text-xs font-bold text-rose-600 hover:bg-rose-50 border border-rose-200 flex items-center gap-1.5 transition-all active:scale-95 shadow-sm"
+                  title="Delete this class"
                 >
-                  Cancel
+                  <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                  <span>Delete Class</span>
                 </button>
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="bg-[#4338ca] hover:bg-[#3730a3] disabled:opacity-50 text-white text-xs font-bold px-6 py-2.5 rounded-xl shadow-md transition-all flex items-center gap-2"
-                >
-                  {isSubmitting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                  <span>Save Changes</span>
-                </button>
+
+                <div className="flex items-center gap-2 ml-auto">
+                  <button
+                    type="button"
+                    onClick={() => setEditingClass(null)}
+                    className="px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSubmitting}
+                    className="bg-[#4338ca] hover:bg-[#3730a3] disabled:opacity-50 text-white text-xs font-bold px-6 py-2.5 rounded-xl shadow-md transition-all flex items-center gap-2"
+                  >
+                    {isSubmitting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                    <span>Save Changes</span>
+                  </button>
+                </div>
               </div>
             </form>
           </div>

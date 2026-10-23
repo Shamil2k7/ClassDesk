@@ -384,7 +384,12 @@ export default function ExamsPage() {
 
   // Effective student identity for student / parent view
   const child = activeChild as Student | null;
-  const foundStudent = studentsList.find((s) => s.id === user?.id || s.parent_phone === user?.phone);
+  const cleanPhone = user?.phone ? user.phone.replace(/\D/g, '').slice(-10) : '';
+  const foundStudent = studentsList.find(
+    (s) =>
+      s.id === user?.id ||
+      (cleanPhone && s.parent_phone && s.parent_phone.replace(/\D/g, '').slice(-10) === cleanPhone)
+  );
   const effectiveStudent: Student = child
     ? child
     : foundStudent

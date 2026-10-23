@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/lib/auth-context';
 import { useTranslation } from '@/lib/i18n/context';
@@ -18,7 +18,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
-import { Note, Subject, ClassBatch } from '@/types/app.types';
+import { Note, Subject, ClassBatch, TimetableEntry } from '@/types/app.types';
 import { SchemaNotice } from '@/components/common/schema-notice';
 import {
   getLocalDataForInstitute,
@@ -39,6 +39,7 @@ export default function NotesPage() {
   const [notesList, setNotesList] = useState<Note[]>([]);
   const [subjectsList, setSubjectsList] = useState<Subject[]>([]);
   const [classesList, setClassesList] = useState<ClassBatch[]>([]);
+  const [timetableList, setTimetableList] = useState<TimetableEntry[]>([]);
   const [selectedSubjectId, setSelectedSubjectId] = useState<string>('all');
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -76,6 +77,7 @@ export default function NotesPage() {
         setNotesList(getLocalDataForInstitute<Note>('notes', instId));
         setSubjectsList(getLocalDataForInstitute<Subject>('subjects', instId));
         setClassesList(getLocalDataForInstitute<ClassBatch>('classes', instId));
+        setTimetableList(getLocalDataForInstitute<TimetableEntry>('timetable', instId));
         return;
       }
       if (nData) {
@@ -115,11 +117,24 @@ export default function NotesPage() {
         setClassesList(localCls);
         if (localCls.length > 0) setClassId((prev) => prev || localCls[0].id);
       }
+
+      // Timetable
+      let tQuery = supabase.from('timetable').select('*');
+      if (instId) {
+        tQuery = tQuery.eq('institute_id', instId);
+      }
+      const { data: tData } = await tQuery;
+      if (tData) {
+        setTimetableList(syncLocalWithRemote('timetable', tData as TimetableEntry[], instId));
+      } else {
+        setTimetableList(getLocalDataForInstitute<TimetableEntry>('timetable', instId));
+      }
     } catch (err) {
       console.warn('Error loading notes:', err);
       setNotesList(getLocalDataForInstitute<Note>('notes', instId));
       setSubjectsList(getLocalDataForInstitute<Subject>('subjects', instId));
       setClassesList(getLocalDataForInstitute<ClassBatch>('classes', instId));
+      setTimetableList(getLocalDataForInstitute<TimetableEntry>('timetable', instId));
     } finally {
       setLoading(false);
     }
@@ -130,6 +145,7 @@ export default function NotesPage() {
     const localNotes = getLocalDataForInstitute<Note>('notes', instId);
     const localSubs = getLocalDataForInstitute<Subject>('subjects', instId);
     const localCls = getLocalDataForInstitute<ClassBatch>('classes', instId);
+    const localTt = getLocalDataForInstitute<TimetableEntry>('timetable', instId);
     if (localNotes.length > 0) setNotesList(localNotes);
     if (localSubs.length > 0) {
       setSubjectsList(localSubs);
@@ -139,12 +155,44 @@ export default function NotesPage() {
       setClassesList(localCls);
       setClassId((prev) => prev || localCls[0].id);
     }
+    if (localTt.length > 0) {
+      setTimetableList(localTt);
+    }
     loadData();
   }, [loadData, instId, authLoading]);
 
-  const filteredNotes = notesList.filter(
-    (n) => selectedSubjectId === 'all' || n.subject_id === selectedSubjectId
-  );
+  const isTeacher = user?.role === 'teacher';
+
+  // Determine subjects assigned strictly to the logged-in teacher
+  const assignedSubjectIds = useMemo(() => {
+    if (!isTeacher) return null; // Non-teachers (admin/super admin) see all
+    const teacherId = user?.id;
+    const directSubjectIds = subjectsList
+      .filter((s) => s.teacher_id === teacherId)
+      .map((s) => s.id);
+    const timetableSubjectIds = timetableList
+      .filter((t) => t.teacher_id === teacherId)
+      .map((t) => t.subject_id);
+    return new Set([...directSubjectIds, ...timetableSubjectIds]);
+  }, [isTeacher, user?.id, subjectsList, timetableList]);
+
+  // Subject options available to display in tabs & forms
+  const visibleSubjects = useMemo(() => {
+    if (!isTeacher || !assignedSubjectIds) return subjectsList;
+    return subjectsList.filter((s) => assignedSubjectIds.has(s.id));
+  }, [isTeacher, assignedSubjectIds, subjectsList]);
+
+  // Filtered notes to show: For teachers, ONLY show assigned subject notes or notes they uploaded
+  const filteredNotes = useMemo(() => {
+    return notesList.filter((n) => {
+      if (isTeacher && assignedSubjectIds) {
+        const isAssigned = assignedSubjectIds.has(n.subject_id) || n.uploaded_by === user?.id;
+        if (!isAssigned) return false;
+      }
+      if (selectedSubjectId === 'all') return true;
+      return n.subject_id === selectedSubjectId;
+    });
+  }, [notesList, isTeacher, assignedSubjectIds, user?.id, selectedSubjectId]);
 
   const handleUploadNote = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -152,7 +200,7 @@ export default function NotesPage() {
 
     const effectiveInstId = instId || '00000000-0000-0000-0000-000000000001';
     const targetClassId = classId || classesList[0]?.id || '00000000-0000-0000-0000-000000000002';
-    const targetSubjectId = subjectId || subjectsList[0]?.id || '00000000-0000-0000-0000-000000000003';
+    const targetSubjectId = subjectId || visibleSubjects[0]?.id || subjectsList[0]?.id || '00000000-0000-0000-0000-000000000003';
 
     const newNotePayload = {
       institute_id: effectiveInstId,
@@ -284,7 +332,7 @@ export default function NotesPage() {
       </div>
 
       {/* Subject Filter Chips */}
-      {subjectsList.length > 0 && (
+      {visibleSubjects.length > 0 && (
         <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
           <button
             onClick={() => setSelectedSubjectId('all')}
@@ -294,9 +342,9 @@ export default function NotesPage() {
                 : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
             }`}
           >
-            All Subjects ({notesList.length})
+            {isTeacher ? 'My Assigned Subjects' : 'All Subjects'} ({filteredNotes.length})
           </button>
-          {subjectsList.map((sub) => (
+          {visibleSubjects.map((sub) => (
             <button
               key={sub.id}
               onClick={() => setSelectedSubjectId(sub.id)}
@@ -309,6 +357,15 @@ export default function NotesPage() {
               {sub.name}
             </button>
           ))}
+        </div>
+      )}
+
+      {isTeacher && visibleSubjects.length === 0 && !loading && (
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-xs text-amber-800">
+          <p className="font-bold">No assigned subjects found</p>
+          <p className="mt-0.5 text-amber-700">
+            You do not currently have any subjects assigned to your teacher profile. Ask your center administrator to assign your subjects or timetable slots to view and upload study materials.
+          </p>
         </div>
       )}
 
@@ -460,19 +517,19 @@ export default function NotesPage() {
                 </div>
               )}
 
-              {subjectsList.length > 0 && (
+              {visibleSubjects.length > 0 && (
                 <div>
                   <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">
-                    Subject
+                    {isTeacher ? 'Assigned Subject' : 'Subject'}
                   </label>
                   <select
                     value={subjectId}
                     onChange={(e) => setSubjectId(e.target.value)}
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800"
                   >
-                    {subjectsList.map((s) => (
+                    {visibleSubjects.map((s) => (
                       <option key={s.id} value={s.id}>
-                        {s.name} ({s.code})
+                        {s.name} ({s.code || 'SUB'})
                       </option>
                     ))}
                   </select>
@@ -591,19 +648,19 @@ export default function NotesPage() {
                 </div>
               )}
 
-              {subjectsList.length > 0 && (
+              {visibleSubjects.length > 0 && (
                 <div>
                   <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">
-                    Subject
+                    {isTeacher ? 'Assigned Subject' : 'Subject'}
                   </label>
                   <select
                     value={editSubjectId}
                     onChange={(e) => setEditSubjectId(e.target.value)}
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800"
                   >
-                    {subjectsList.map((s) => (
+                    {visibleSubjects.map((s) => (
                       <option key={s.id} value={s.id}>
-                        {s.name} ({s.code})
+                        {s.name} ({s.code || 'SUB'})
                       </option>
                     ))}
                   </select>

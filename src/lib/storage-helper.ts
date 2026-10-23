@@ -32,13 +32,14 @@ export function getLocalDataForInstitute<T extends { institute_id?: string | nul
 ): T[] {
   const all = getLocalData<T>(key, fallback);
   if (!instituteId) return all;
-  const filtered = all.filter(
-    (item) =>
-      !item.institute_id ||
-      item.institute_id === instituteId ||
-      item.institute_id === DEFAULT_DEMO_INSTITUTE_ID
-  );
-  return filtered.length > 0 ? filtered : all;
+  const isDefaultDemo = instituteId === DEFAULT_DEMO_INSTITUTE_ID;
+  const filtered = all.filter((item) => {
+    if (isDefaultDemo) {
+      return !item.institute_id || item.institute_id === instituteId;
+    }
+    return item.institute_id === instituteId;
+  });
+  return filtered;
 }
 
 export function saveLocalData<T>(key: string, data: T[]): void {
@@ -140,7 +141,13 @@ export function syncLocalWithRemote<T extends { id?: string; institute_id?: stri
     return local;
   }
 
-  const remoteIds = new Set(remoteData.map((r) => r.id).filter(Boolean));
+  const validRemote = instituteId
+    ? (isDefaultDemo
+        ? remoteData.filter((r) => !r.institute_id || r.institute_id === instituteId)
+        : remoteData.filter((r) => r.institute_id === instituteId))
+    : remoteData;
+
+  const remoteIds = new Set(validRemote.map((r) => r.id).filter(Boolean));
 
   // Local items for this institute that haven't synced yet
   const unsyncedThisInst = local.filter(
@@ -158,7 +165,7 @@ export function syncLocalWithRemote<T extends { id?: string; institute_id?: stri
       )
     : [];
 
-  const mergedThis = [...remoteData, ...unsyncedThisInst];
+  const mergedThis = [...validRemote, ...unsyncedThisInst];
   const total = [...mergedThis, ...otherInstData];
   saveLocalData(key, total);
 

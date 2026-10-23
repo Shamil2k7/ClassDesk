@@ -298,7 +298,15 @@ export default function AttendancePage() {
   // 3. Parent View: Load Attendance for Active Child
   useEffect(() => {
     if (!isStaff) {
-      const targetStudent = activeChild || getLocalData<Student>('students')[0] || null;
+      const cleanPhone = user?.phone ? user.phone.replace(/\D/g, '').slice(-10) : '';
+      const localInstStudents = getLocalDataForInstitute<Student>('students', instId);
+      const targetStudent =
+        activeChild ||
+        (cleanPhone
+          ? localInstStudents.find((s) => s.parent_phone && s.parent_phone.replace(/\D/g, '').slice(-10) === cleanPhone)
+          : null) ||
+        (user?.id ? localInstStudents.find((s) => s.id === user.id) : null) ||
+        (localInstStudents.length > 0 ? localInstStudents[0] : null);
       if (!targetStudent?.id) return;
 
       const studentId = targetStudent.id;
@@ -357,8 +365,6 @@ export default function AttendancePage() {
         ...classStudents.map((s) => (s as any).section).filter(Boolean),
         ...siblingBatches.map((b) => b.section).filter(Boolean),
         currentClassObj?.section,
-        'A',
-        'B',
       ].filter(Boolean)
     )
   ) as string[];
@@ -470,7 +476,15 @@ export default function AttendancePage() {
   // PARENT VIEW: Personal Student Attendance Calendar & Log
   // -------------------------------------------------------------
   if (!isStaff) {
-    const targetStudent = activeChild || getLocalData<Student>('students')[0] || null;
+    const cleanPhone = user?.phone ? user.phone.replace(/\D/g, '').slice(-10) : '';
+    const localInstStudents = getLocalDataForInstitute<Student>('students', instId);
+    const targetStudent =
+      activeChild ||
+      (cleanPhone
+        ? localInstStudents.find((s) => s.parent_phone && s.parent_phone.replace(/\D/g, '').slice(-10) === cleanPhone)
+        : null) ||
+      (user?.id ? localInstStudents.find((s) => s.id === user.id) : null) ||
+      (localInstStudents.length > 0 ? localInstStudents[0] : null);
     const targetStudentId = targetStudent?.id;
 
     const effectiveParentAttendance = parentAttendance.length > 0
@@ -540,7 +554,7 @@ export default function AttendancePage() {
                   {studentDisplayName}&apos;s Attendance
                 </h2>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  Roll #{activeChild?.roll_number || '001'} • Admission: {activeChild?.admission_number || 'ADM-9202'}
+                  Roll #{targetStudent?.roll_number || 'N/A'} • Admission: {targetStudent?.admission_number || 'N/A'}
                 </p>
               </div>
             </div>
@@ -963,33 +977,35 @@ export default function AttendancePage() {
             )}
           </div>
 
-          <div>
-            <label className="block text-[11px] font-bold text-slate-500 uppercase mb-1">
-              Section (Separate Roll Call)
-            </label>
-            <select
-              value={selectedSection}
-              onChange={(e) => {
-                const sec = e.target.value;
-                setSelectedSection(sec);
-                // If a sibling batch exists matching this section, sync class batch
-                const matchedBatch = siblingBatches.find(
-                  (b) => b.section?.trim().toUpperCase() === sec.trim().toUpperCase()
-                );
-                if (matchedBatch && matchedBatch.id !== selectedClassId) {
-                  setSelectedClassId(matchedBatch.id);
-                }
-              }}
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            >
-              <option value="all">All Sections ({classStudents.length} Students)</option>
-              {availableSections.map((sec) => (
-                <option key={sec} value={sec}>
-                  Section {sec}
-                </option>
-              ))}
-            </select>
-          </div>
+          {availableSections.length > 0 && (
+            <div>
+              <label className="block text-[11px] font-bold text-slate-500 uppercase mb-1">
+                Section (Separate Roll Call)
+              </label>
+              <select
+                value={selectedSection}
+                onChange={(e) => {
+                  const sec = e.target.value;
+                  setSelectedSection(sec);
+                  // If a sibling batch exists matching this section, sync class batch
+                  const matchedBatch = siblingBatches.find(
+                    (b) => b.section?.trim().toUpperCase() === sec.trim().toUpperCase()
+                  );
+                  if (matchedBatch && matchedBatch.id !== selectedClassId) {
+                    setSelectedClassId(matchedBatch.id);
+                  }
+                }}
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              >
+                <option value="all">All Sections ({classStudents.length} Students)</option>
+                {availableSections.map((sec) => (
+                  <option key={sec} value={sec}>
+                    Section {sec}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           <div>
             <label className="block text-[11px] font-bold text-slate-500 uppercase mb-1">
@@ -1005,60 +1021,62 @@ export default function AttendancePage() {
         </div>
 
         {/* Section Quick Toggle Pills */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none pt-1">
-          <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 mr-1 shrink-0">
-            Section:
-          </span>
-          <button
-            type="button"
-            onClick={() => setSelectedSection('all')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 active:scale-95 ${
-              selectedSection === 'all'
-                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-100 ring-2 ring-indigo-300'
-                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-            }`}
-          >
-            All Sections
-          </button>
-          {availableSections.map((sec) => {
-            const countInSec = classStudents.filter((s) => {
-              const stuSec = (s as any).section || currentClassObj?.section || 'A';
-              return stuSec.trim().toUpperCase() === sec.trim().toUpperCase();
-            }).length;
+        {availableSections.length > 1 && (
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none pt-1">
+            <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 mr-1 shrink-0">
+              Section:
+            </span>
+            <button
+              type="button"
+              onClick={() => setSelectedSection('all')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 active:scale-95 ${
+                selectedSection === 'all'
+                  ? 'bg-indigo-600 text-white shadow-md shadow-indigo-100 ring-2 ring-indigo-300'
+                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+              }`}
+            >
+              All Sections
+            </button>
+            {availableSections.map((sec) => {
+              const countInSec = classStudents.filter((s) => {
+                const stuSec = (s as any).section || currentClassObj?.section || 'A';
+                return stuSec.trim().toUpperCase() === sec.trim().toUpperCase();
+              }).length;
 
-            return (
-              <button
-                key={sec}
-                type="button"
-                onClick={() => {
-                  setSelectedSection(sec);
-                  const matchedBatch = siblingBatches.find(
-                    (b) => b.section?.trim().toUpperCase() === sec.trim().toUpperCase()
-                  );
-                  if (matchedBatch && matchedBatch.id !== selectedClassId) {
-                    setSelectedClassId(matchedBatch.id);
-                  }
-                }}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 active:scale-95 flex items-center gap-1.5 ${
-                  selectedSection === sec
-                    ? 'bg-indigo-600 text-white shadow-md shadow-indigo-100 ring-2 ring-indigo-300'
-                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                }`}
-              >
-                <span>Section {sec}</span>
-                {countInSec > 0 && (
-                  <span
-                    className={`text-[10px] px-1.5 py-0.2 rounded-md ${
-                      selectedSection === sec ? 'bg-indigo-700 text-white' : 'bg-slate-200 text-slate-700'
-                    }`}
-                  >
-                    {countInSec}
-                  </span>
-                )}
-              </button>
-            );
-          })}
-        </div>
+              return (
+                <button
+                  key={sec}
+                  type="button"
+                  onClick={() => {
+                    setSelectedSection(sec);
+                    const matchedBatch = siblingBatches.find(
+                      (b) => b.section?.trim().toUpperCase() === sec.trim().toUpperCase()
+                    );
+                    if (matchedBatch && matchedBatch.id !== selectedClassId) {
+                      setSelectedClassId(matchedBatch.id);
+                    }
+                  }}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 active:scale-95 flex items-center gap-1.5 ${
+                    selectedSection === sec
+                      ? 'bg-indigo-600 text-white shadow-md shadow-indigo-100 ring-2 ring-indigo-300'
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  }`}
+                >
+                  <span>Section {sec}</span>
+                  {countInSec > 0 && (
+                    <span
+                      className={`text-[10px] px-1.5 py-0.2 rounded-md ${
+                        selectedSection === sec ? 'bg-indigo-700 text-white' : 'bg-slate-200 text-slate-700'
+                      }`}
+                    >
+                      {countInSec}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        )}
 
         {/* Attendance Counter Strip for Displayed Section */}
         {displayedStudents.length > 0 && (

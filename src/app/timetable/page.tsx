@@ -21,7 +21,7 @@ import {
   ExternalLink,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
-import { TimetableEntry, Subject, ClassBatch, UserProfile } from '@/types/app.types';
+import { TimetableEntry, Subject, ClassBatch, UserProfile, Student } from '@/types/app.types';
 import { SchemaNotice } from '@/components/common/schema-notice';
 import {
   getLocalDataForInstitute,
@@ -136,9 +136,17 @@ export default function TimetablePage() {
         const mergedClasses = syncLocalWithRemote('classes', classes, instId);
         setClassesList(mergedClasses);
 
-        // Auto-select active student's class if parent or student
-        if (activeChild?.class_id && mergedClasses.some((c) => c.id === activeChild.class_id)) {
-          setSelectedClassId(activeChild.class_id);
+        const cleanPhone = user?.phone ? user.phone.replace(/\D/g, '').slice(-10) : '';
+        const localInstStudents = getLocalDataForInstitute<Student>('students', instId);
+        const dynamicStudent =
+          activeChild ||
+          (cleanPhone
+            ? localInstStudents.find((s) => s.parent_phone && s.parent_phone.replace(/\D/g, '').slice(-10) === cleanPhone)
+            : null) ||
+          (user?.id ? localInstStudents.find((s) => s.id === user.id) : null);
+
+        if (dynamicStudent?.class_id && mergedClasses.some((c) => c.id === dynamicStudent.class_id)) {
+          setSelectedClassId(dynamicStudent.class_id);
         } else {
           setSelectedClassId((prev) => (mergedClasses.some((c) => c.id === prev) ? prev : mergedClasses[0].id));
         }

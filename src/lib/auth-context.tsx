@@ -4,7 +4,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { UserRole } from '@/types/database.types';
 import { Institute, Student, UserProfile } from '@/types/app.types';
 import { createClient } from '@/lib/supabase/client';
-import { getLocalData, saveLocalData, syncLocalWithRemote } from '@/lib/storage-helper';
+import { getLocalData, getLocalDataForInstitute, saveLocalData, syncLocalWithRemote } from '@/lib/storage-helper';
 
 interface AuthState {
   user: UserProfile | null;
@@ -109,9 +109,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             }
           } catch {}
 
-          // Always merge with persistent local storage
-          const localStudents = getLocalData<Student>('students');
+          // Always merge with persistent local storage strictly for this institute
+          const localStudents = getLocalDataForInstitute<Student>('students', userObj.institute_id);
           const localMatches = localStudents.filter((s) => {
+            if (s.id === userObj.id) return true;
             if (!s.parent_phone) return false;
             const pClean = s.parent_phone.replace(/\D/g, '').slice(-10);
             return pClean === cleanPhone || s.parent_phone === phoneToQuery;
@@ -121,17 +122,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           stuList.forEach((s) => allChildrenMap.set(s.id, s));
           localMatches.forEach((s) => allChildrenMap.set(s.id, s));
 
-          if (allChildrenMap.size === 0 && localStudents.length > 0) {
-            localStudents.slice(-3).forEach((s) => allChildrenMap.set(s.id, s));
-          }
-
           const finalChildren = Array.from(allChildrenMap.values());
           if (finalChildren.length > 0) {
             setLinkedChildren(finalChildren);
             const savedChildId = localStorage.getItem('classdesk_active_child');
             const current =
-              finalChildren.find((s) => s.id === savedChildId) ||
-              finalChildren[finalChildren.length - 1];
+              (savedChildId ? finalChildren.find((s) => s.id === savedChildId) : null) ||
+              finalChildren[0];
             setActiveChild(current);
             localStorage.setItem('classdesk_active_child', current.id);
 
@@ -207,14 +204,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               setUser(parsed);
               setIsAuthenticated(true);
 
-              // Restore active institute
+              // Restore active institute strictly isolated to user's institute
               const savedInst = localStorage.getItem('classdesk_active_institute');
+              let restoredInst: Institute | null = null;
               if (savedInst) {
                 try {
-                  setInstitute(JSON.parse(savedInst));
+                  const parsedInst = JSON.parse(savedInst);
+                  if (parsed.role === 'super_admin' || (parsed.institute_id && parsedInst?.id === parsed.institute_id)) {
+                    restoredInst = parsedInst;
+                  }
                 } catch {
                   // ignore
                 }
+              }
+
+              if (restoredInst) {
+                setInstitute(restoredInst);
               } else if (parsed.institute_id) {
                 const localInsts = getLocalData<Institute>('institutes');
                 const found = localInsts.find((i) => i.id === parsed.institute_id);
@@ -232,27 +237,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     localStorage.setItem('classdesk_active_institute', JSON.stringify(inst));
                   }
                 }
+              } else if (parsed.role !== 'super_admin') {
+                setInstitute(null);
+                localStorage.removeItem('classdesk_active_institute');
               }
 
               // Restore linked children if parent
               if (parsed.role === 'parent') {
-                const localStudents = getLocalData<Student>('students');
+                const localStudents = getLocalDataForInstitute<Student>('students', parsed.institute_id);
                 const cleanPhone = parsed.phone ? parsed.phone.replace(/\D/g, '').slice(-10) : '';
-                let linked = localStudents.filter(
+                const linked = localStudents.filter(
                   (s) =>
+                    s.id === parsed.id ||
                     (s.parent_phone && s.parent_phone === parsed.phone) ||
                     (cleanPhone && s.parent_phone?.replace(/\D/g, '').slice(-10) === cleanPhone)
                 );
-                if (linked.length === 0 && localStudents.length > 0) {
-                  linked = localStudents;
-                }
                 if (linked.length > 0) {
                   setLinkedChildren(linked);
                   const savedChildId = localStorage.getItem('classdesk_active_child');
                   const currentChild =
-                    linked.find((s) => s.id === savedChildId) || linked[linked.length - 1];
+                    (savedChildId ? linked.find((s) => s.id === savedChildId) : null) || linked[0];
                   setActiveChild(currentChild);
                   localStorage.setItem('classdesk_active_child', currentChild.id);
+                } else {
+                  setLinkedChildren([]);
+                  setActiveChild(null);
+                  localStorage.removeItem('classdesk_active_child');
                 }
               }
               return;
@@ -282,12 +292,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           localStorage.setItem('classdesk_auth_user', JSON.stringify(defaultSession));
 
           if (savedRole === 'parent') {
-            const localStudents = getLocalData<Student>('students');
+            const localStudents = getLocalDataForInstitute<Student>('students', defaultSession.institute_id);
             if (localStudents.length > 0) {
               const savedChildId = localStorage.getItem('classdesk_active_child');
               const currentChild =
-                localStudents.find((s) => s.id === savedChildId) ||
-                localStudents[localStudents.length - 1];
+                (savedChildId ? localStudents.find((s) => s.id === savedChildId) : null) ||
+                localStudents[0];
               setLinkedChildren(localStudents);
               setActiveChild(currentChild);
               localStorage.setItem('classdesk_active_child', currentChild.id);
@@ -762,23 +772,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       if (resolvedUser.role === 'parent') {
-        const localStudents = getLocalData<Student>('students');
+        const localStudents = getLocalDataForInstitute<Student>('students', resolvedUser.institute_id);
         let childrenToUse = resolvedChildren;
         if (childrenToUse.length === 0) {
           const linked = localStudents.filter((s) => {
+            if (s.id === resolvedUser?.id) return true;
             if (!s.parent_phone) return false;
             const pClean = s.parent_phone.replace(/\D/g, '').slice(-10);
             return pClean === cleanPhone || s.parent_phone === formattedPhone;
           });
-          childrenToUse = linked.length > 0 ? linked : localStudents;
+          childrenToUse = linked;
         }
 
         if (childrenToUse.length > 0) {
           setLinkedChildren(childrenToUse);
           const savedChildId = localStorage.getItem('classdesk_active_child');
           const activeOne =
-            childrenToUse.find((s) => s.id === savedChildId) ||
-            childrenToUse[childrenToUse.length - 1];
+            (savedChildId ? childrenToUse.find((s) => s.id === savedChildId) : null) ||
+            childrenToUse[0];
           setActiveChild(activeOne);
           localStorage.setItem('classdesk_active_child', activeOne.id);
         } else {
@@ -799,7 +810,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const switchChild = (studentId: string) => {
-    const localStudents = getLocalData<Student>('students');
+    const localStudents = getLocalDataForInstitute<Student>('students', user?.institute_id);
     const target =
       linkedChildren.find((c) => c.id === studentId) ||
       localStudents.find((c) => c.id === studentId);
@@ -863,12 +874,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem('classdesk_auth_user', JSON.stringify(demoUser));
 
     if (role === 'parent') {
-      const localStudents = getLocalData<Student>('students');
+      const localStudents = getLocalDataForInstitute<Student>('students', demoUser.institute_id);
       if (localStudents.length > 0) {
         const savedChildId = localStorage.getItem('classdesk_active_child');
         const current =
-          localStudents.find((s) => s.id === savedChildId) ||
-          localStudents[localStudents.length - 1];
+          (savedChildId ? localStudents.find((s) => s.id === savedChildId) : null) ||
+          localStudents[0];
         setLinkedChildren(localStudents);
         setActiveChild(current);
         localStorage.setItem('classdesk_active_child', current.id);

@@ -316,11 +316,20 @@ export default function FeesPage() {
   // PARENT VIEW: Child's Pending Dues, Current Month Status & Downloadable Receipts
   // -------------------------------------------------------------
   if (!isStaff) {
-    const targetStudent = activeChild || (studentsList.length > 0 ? studentsList[0] : null);
-    const targetStudentId = targetStudent?.id;
+    const cleanPhone = user?.phone ? user.phone.replace(/\D/g, '').slice(-10) : '';
+    const targetStudent =
+      activeChild ||
+      (cleanPhone
+        ? studentsList.find((s) => s.parent_phone && s.parent_phone.replace(/\D/g, '').slice(-10) === cleanPhone)
+        : null) ||
+      (user?.id ? studentsList.find((s) => s.id === user.id) : null) ||
+      (studentsList.length > 0 && !isStaff
+        ? (instId ? studentsList.find((s) => s.institute_id === instId) || null : null)
+        : null);
+    const targetStudentId = targetStudent?.id || null;
 
-    const myDues = duesList.filter((d) => d.student_id === targetStudentId);
-    const myPayments = paymentsList.filter((p) => p.student_id === targetStudentId);
+    const myDues = targetStudentId ? duesList.filter((d) => d.student_id === targetStudentId) : [];
+    const myPayments = targetStudentId ? paymentsList.filter((p) => p.student_id === targetStudentId) : [];
     const pendingDue = myDues.find((d) => d.status === 'pending');
 
     // Current Month calculations

@@ -4,7 +4,7 @@ import React from 'react';
 import { useAuth } from '@/lib/auth-context';
 import { useTranslation } from '@/lib/i18n/context';
 import { Users, Check, ChevronDown } from 'lucide-react';
-import { getLocalData } from '@/lib/storage-helper';
+import { getLocalDataForInstitute } from '@/lib/storage-helper';
 import { Student } from '@/types/app.types';
 
 interface ChildSwitcherProps {
@@ -23,11 +23,11 @@ export function ChildSwitcher({ variant = 'light' }: ChildSwitcherProps) {
   const effectiveChildren =
     linkedChildren && linkedChildren.length > 0
       ? linkedChildren
-      : getLocalData<Student>('students');
+      : getLocalDataForInstitute<Student>('students', user?.institute_id);
 
   const childName =
     activeChild?.full_name ||
-    (effectiveChildren.length > 0 ? effectiveChildren[0].full_name : 'Active Student');
+    (effectiveChildren.length > 0 ? effectiveChildren[0].full_name : user?.full_name || 'Active Student');
   const hasMultiple = effectiveChildren && effectiveChildren.length > 1;
 
   const buttonClasses =
