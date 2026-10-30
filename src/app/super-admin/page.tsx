@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import Link from 'next/link';
 import { useAuth } from '@/lib/auth-context';
 import {
   Building2,
@@ -11,6 +12,7 @@ import {
   Search,
   ExternalLink,
   ShieldAlert,
+  ShieldCheck,
   CheckCircle2,
   Clock,
   Sparkles,
@@ -40,7 +42,7 @@ import {
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { SchemaNotice } from '@/components/common/schema-notice';
-import { Institute } from '@/types/app.types';
+import { Institute, SuperAdminAccount } from '@/types/app.types';
 import { usePlatformBranding, DEFAULT_PLATFORM_BRANDING } from '@/lib/platform-config';
 import {
   getLocalData,
@@ -67,12 +69,28 @@ export default function SuperAdminPortalPage() {
   const supabase = createClient();
 
   // Tab State
-  const [activeTab, setActiveTab] = useState<'tenants' | 'plans' | 'revenue' | 'system' | 'branding'>('tenants');
+  const [activeTab, setActiveTab] = useState<'tenants' | 'plans' | 'revenue' | 'system' | 'branding' | 'admins'>('tenants');
   const [institutes, setInstitutes] = useState<Institute[]>([]);
   const [loading, setLoading] = useState(false);
   const [schemaMissing, setSchemaMissing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
+
+  // Super Admin Management State (Feature 1)
+  const [superAdmins, setSuperAdmins] = useState<SuperAdminAccount[]>([]);
+  const [loadingAdmins, setLoadingAdmins] = useState(false);
+  const [showAddAdminModal, setShowAddAdminModal] = useState(false);
+  const [newAdminName, setNewAdminName] = useState('');
+  const [newAdminEmail, setNewAdminEmail] = useState('');
+  const [newAdminPhone, setNewAdminPhone] = useState('+91 ');
+  const [newAdminPassword, setNewAdminPassword] = useState('');
+  const [isSubmittingAdmin, setIsSubmittingAdmin] = useState(false);
+
+  const [adminActionModal, setAdminActionModal] = useState<{
+    admin: SuperAdminAccount;
+    action: 'activate' | 'deactivate' | 'delete';
+  } | null>(null);
+  const [isProcessingAdminAction, setIsProcessingAdminAction] = useState(false);
 
   // Platform Branding State (SaaS Master Logo & Name)
   const { branding, updateBranding, resetBranding } = usePlatformBranding();
@@ -133,6 +151,158 @@ export default function SuperAdminPortalPage() {
     if (local.length > 0) setInstitutes(local);
     loadInstitutes();
   }, [loadInstitutes]);
+
+  // Load Super Admin Accounts
+  const loadSuperAdmins = React.useCallback(async () => {
+    setLoadingAdmins(true);
+    try {
+      const res = await fetch('/api/super-admin/admins', {
+        headers: {
+          'x-user-role': user?.role || 'super_admin',
+          'x-user-id': user?.id || '',
+        },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.admins && Array.isArray(data.admins)) {
+          setSuperAdmins(data.admins);
+          saveLocalData('super_admins', data.admins);
+          setLoadingAdmins(false);
+          return;
+        }
+      }
+      const local = getLocalData<SuperAdminAccount>('super_admins');
+      if (local && local.length > 0) {
+        setSuperAdmins(local);
+      } else {
+        const defaultAdmin: SuperAdminAccount = {
+          id: 'super-admin-root',
+          full_name: 'Lead Super Administrator',
+          email: 'superadmin@classdesk.app',
+          phone: '+919999900001',
+          is_active: true,
+          created_at: new Date(Date.now() - 60 * 24 * 3600 * 1000).toISOString(),
+          last_sign_in_at: new Date().toISOString(),
+        };
+        setSuperAdmins([defaultAdmin]);
+        saveLocalData('super_admins', [defaultAdmin]);
+      }
+    } catch {
+      const local = getLocalData<SuperAdminAccount>('super_admins');
+      if (local && local.length > 0) setSuperAdmins(local);
+    } finally {
+      setLoadingAdmins(false);
+    }
+  }, [user]);
+
+  React.useEffect(() => {
+    loadSuperAdmins();
+  }, [loadSuperAdmins]);
+
+  // Create Super Admin
+  const handleCreateSuperAdmin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newAdminName.trim() || !newAdminEmail.trim() || !newAdminPassword) {
+      setActionError('All fields are required');
+      return;
+    }
+    setIsSubmittingAdmin(true);
+    setActionError(null);
+
+    try {
+      const res = await fetch('/api/super-admin/admins', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-role': user?.role || 'super_admin',
+          'x-user-id': user?.id || '',
+        },
+        body: JSON.stringify({
+          full_name: newAdminName.trim(),
+          email: newAdminEmail.trim().toLowerCase(),
+          phone: newAdminPhone.replace(/\s+/g, ''),
+          password: newAdminPassword,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to create Super Admin account');
+      }
+
+      if (data.admin) {
+        setSuperAdmins((prev) => [data.admin, ...prev]);
+        appendLocalData('super_admins', data.admin);
+      }
+
+      setActionSuccess(`Super Admin account created for "${newAdminName}"!`);
+      setShowAddAdminModal(false);
+      setNewAdminName('');
+      setNewAdminEmail('');
+      setNewAdminPhone('+91 ');
+      setNewAdminPassword('');
+      setTimeout(() => setActionSuccess(null), 4000);
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : 'Error creating Super Admin');
+    } finally {
+      setIsSubmittingAdmin(false);
+    }
+  };
+
+  // Confirm Admin Action (Activate, Deactivate, Delete)
+  const handleConfirmAdminAction = async () => {
+    if (!adminActionModal) return;
+    const { admin, action } = adminActionModal;
+    setIsProcessingAdminAction(true);
+    setActionError(null);
+
+    try {
+      if (action === 'delete') {
+        const res = await fetch(`/api/super-admin/admins?id=${admin.id}`, {
+          method: 'DELETE',
+          headers: {
+            'x-user-role': user?.role || 'super_admin',
+            'x-user-id': user?.id || '',
+          },
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Failed to delete Super Admin');
+
+        setSuperAdmins((prev) => prev.filter((a) => a.id !== admin.id));
+        removeLocalData('super_admins', admin.id);
+        setActionSuccess(`Super Admin account "${admin.full_name}" has been removed.`);
+      } else {
+        const targetIsActive = action === 'activate';
+        const res = await fetch('/api/super-admin/admins', {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-user-role': user?.role || 'super_admin',
+            'x-user-id': user?.id || '',
+          },
+          body: JSON.stringify({
+            id: admin.id,
+            is_active: targetIsActive,
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || `Failed to ${action} Super Admin`);
+
+        setSuperAdmins((prev) =>
+          prev.map((a) => (a.id === admin.id ? { ...a, is_active: targetIsActive } : a))
+        );
+        updateLocalData('super_admins', admin.id, { is_active: targetIsActive });
+        setActionSuccess(`Super Admin account "${admin.full_name}" has been ${action}d.`);
+      }
+
+      setAdminActionModal(null);
+      setTimeout(() => setActionSuccess(null), 4000);
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : `Error during ${action}`);
+    } finally {
+      setIsProcessingAdminAction(false);
+    }
+  };
 
   // Modals
   const [showAddTenantModal, setShowAddTenantModal] = useState(false);
@@ -673,8 +843,29 @@ export default function SuperAdminPortalPage() {
           }`}
         >
           <Sparkles className="w-4 h-4" />
-          <span>Platform Branding (Logo & Name)</span>
+          <span>Platform Branding</span>
         </button>
+
+        <button
+          onClick={() => setActiveTab('admins')}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-bold transition-all shrink-0 ${
+            activeTab === 'admins'
+              ? 'bg-indigo-600 text-white shadow-sm'
+              : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
+          }`}
+        >
+          <ShieldCheck className="w-4 h-4 text-emerald-500" />
+          <span>Super Admins ({superAdmins.length})</span>
+        </button>
+
+        <Link
+          href="/super-admin/institutes"
+          className="ml-auto inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-2xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold transition-colors border border-indigo-200 shrink-0"
+        >
+          <Building2 className="w-4 h-4" />
+          <span>Dedicated Institute Directory</span>
+          <ArrowUpRight className="w-3.5 h-3.5 text-indigo-500" />
+        </Link>
       </div>
 
       {/* ------------------------------------------------------------- */}
@@ -682,6 +873,30 @@ export default function SuperAdminPortalPage() {
       {/* ------------------------------------------------------------- */}
       {activeTab === 'tenants' && (
         <div className="space-y-4">
+          {/* Quick link banner to dedicated institute portal */}
+          <div className="bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-100 rounded-3xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-2xl bg-indigo-600 text-white flex items-center justify-center shrink-0">
+                <Building2 className="w-5 h-5" />
+              </div>
+              <div>
+                <h4 className="text-xs font-bold text-slate-900">
+                  Dedicated Institute Management & Status Portal
+                </h4>
+                <p className="text-[11px] text-slate-500">
+                  View individual institute profiles, academic stats, fee audits, activity logs, and manage account suspensions.
+                </p>
+              </div>
+            </div>
+            <Link
+              href="/super-admin/institutes"
+              className="inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition-all shadow-sm shrink-0"
+            >
+              <span>Open Institutes Portal</span>
+              <ExternalLink className="w-3.5 h-3.5" />
+            </Link>
+          </div>
+
           {/* Search & Status Filter Row */}
           <div className="flex flex-col sm:flex-row gap-3">
             <div className="relative flex-1">
@@ -1231,6 +1446,203 @@ export default function SuperAdminPortalPage() {
               </button>
             </div>
           </form>
+        </div>
+      )}
+
+      {/* ------------------------------------------------------------- */}
+      {/* TAB 6: SUPER ADMIN ACCOUNTS MANAGEMENT                        */}
+      {/* ------------------------------------------------------------- */}
+      {activeTab === 'admins' && (
+        <div className="space-y-6">
+          {/* Header & Actions Bar */}
+          <div className="bg-white border border-slate-200 rounded-3xl p-5 sm:p-6 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600">
+                <ShieldCheck className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-sm font-black text-slate-900 flex items-center gap-2">
+                  <span>Root Platform Super Administrators</span>
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-100 text-indigo-800">
+                    {superAdmins.length} Total
+                  </span>
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Manage users with unrestricted root access to ClassDesk SaaS platform, all tenants, and global configurations.
+                </p>
+              </div>
+            </div>
+
+            <button
+              onClick={() => {
+                setActionError(null);
+                setShowAddAdminModal(true);
+              }}
+              className="bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white px-4 py-2.5 rounded-2xl text-xs font-bold shadow-sm transition-all flex items-center justify-center gap-2 shrink-0"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Add Super Admin</span>
+            </button>
+          </div>
+
+          {/* Safety Rule Card */}
+          <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl flex items-start gap-3">
+            <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+            <div className="text-xs text-amber-900 space-y-1">
+              <p className="font-bold">Platform Safety Guard: Last Active Super Admin Protected</p>
+              <p className="text-amber-800">
+                The application enforces server-level and client-level guards preventing accidental removal or deactivation of the last active Super Admin. There must always be at least one active Super Admin to ensure the platform remains manageable.
+              </p>
+            </div>
+          </div>
+
+          {/* Super Admins Table */}
+          <div className="bg-white border border-slate-200 rounded-3xl shadow-sm overflow-hidden">
+            {loadingAdmins ? (
+              <div className="p-12 text-center flex flex-col items-center justify-center text-slate-400 gap-2">
+                <Loader2 className="w-6 h-6 animate-spin text-indigo-600" />
+                <span className="text-xs font-medium">Loading Super Admin accounts...</span>
+              </div>
+            ) : superAdmins.length === 0 ? (
+              <div className="p-12 text-center text-slate-400 text-xs">
+                No Super Admin accounts registered yet.
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="border-b border-slate-100 bg-slate-50/75 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                      <th className="py-3 px-4">Administrator</th>
+                      <th className="py-3 px-4">Contact</th>
+                      <th className="py-3 px-4">Account Status</th>
+                      <th className="py-3 px-4">Created Date</th>
+                      <th className="py-3 px-4">Last Login</th>
+                      <th className="py-3 px-4 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 text-xs">
+                    {superAdmins.map((admin) => {
+                      const activeAdminsCount = superAdmins.filter((a) => a.is_active).length;
+                      const isLastActive = admin.is_active && activeAdminsCount <= 1;
+
+                      return (
+                        <tr key={admin.id} className="hover:bg-slate-50/70 transition-colors">
+                          <td className="py-3.5 px-4">
+                            <div className="flex items-center gap-3">
+                              <div className="w-9 h-9 rounded-2xl bg-indigo-600 text-white font-bold flex items-center justify-center text-xs shrink-0 shadow-sm">
+                                {admin.full_name?.charAt(0) || 'A'}
+                              </div>
+                              <div>
+                                <p className="font-bold text-slate-900 flex items-center gap-1.5">
+                                  <span>{admin.full_name}</span>
+                                  {admin.id === user?.id && (
+                                    <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-slate-100 text-slate-600 border border-slate-200">
+                                      You
+                                    </span>
+                                  )}
+                                </p>
+                                <p className="text-[11px] text-slate-500 font-mono">{admin.email}</p>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="py-3.5 px-4 font-mono text-[11px] text-slate-600">
+                            {admin.phone || '—'}
+                          </td>
+                          <td className="py-3.5 px-4">
+                            {admin.is_active ? (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                                Active
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200">
+                                <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
+                                Deactivated
+                              </span>
+                            )}
+                          </td>
+                          <td className="py-3.5 px-4 text-slate-500 text-[11px]">
+                            {admin.created_at
+                              ? new Date(admin.created_at).toLocaleDateString('en-IN', {
+                                  day: 'numeric',
+                                  month: 'short',
+                                  year: 'numeric',
+                                })
+                              : '—'}
+                          </td>
+                          <td className="py-3.5 px-4 text-slate-500 text-[11px]">
+                            {admin.last_sign_in_at
+                              ? new Date(admin.last_sign_in_at).toLocaleString('en-IN', {
+                                  day: 'numeric',
+                                  month: 'short',
+                                  hour: '2-digit',
+                                  minute: '2-digit',
+                                })
+                              : 'Never'}
+                          </td>
+                          <td className="py-3.5 px-4 text-right">
+                            <div className="flex items-center justify-end gap-2">
+                              {admin.is_active ? (
+                                <button
+                                  type="button"
+                                  disabled={isLastActive}
+                                  onClick={() =>
+                                    setAdminActionModal({ admin, action: 'deactivate' })
+                                  }
+                                  title={
+                                    isLastActive
+                                      ? 'Cannot deactivate the only active Super Admin'
+                                      : 'Deactivate Super Admin'
+                                  }
+                                  className={`px-2.5 py-1.5 rounded-xl text-[11px] font-bold border transition-all ${
+                                    isLastActive
+                                      ? 'bg-slate-50 border-slate-200 text-slate-400 cursor-not-allowed'
+                                      : 'bg-amber-50 border-amber-200 text-amber-700 hover:bg-amber-100'
+                                  }`}
+                                >
+                                  Deactivate
+                                </button>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setAdminActionModal({ admin, action: 'activate' })
+                                  }
+                                  className="px-2.5 py-1.5 rounded-xl text-[11px] font-bold bg-emerald-50 border border-emerald-200 text-emerald-700 hover:bg-emerald-100 transition-all"
+                                >
+                                  Activate
+                                </button>
+                              )}
+
+                              <button
+                                type="button"
+                                disabled={isLastActive}
+                                onClick={() =>
+                                  setAdminActionModal({ admin, action: 'delete' })
+                                }
+                                title={
+                                  isLastActive
+                                    ? 'Cannot delete the only active Super Admin'
+                                    : 'Remove Super Admin'
+                                }
+                                className={`p-1.5 rounded-xl border transition-all ${
+                                  isLastActive
+                                    ? 'border-slate-200 text-slate-300 cursor-not-allowed'
+                                    : 'border-slate-200 text-slate-400 hover:text-rose-600 hover:bg-rose-50 hover:border-rose-200'
+                                }`}
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
@@ -1903,6 +2315,185 @@ export default function SuperAdminPortalPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ------------------------------------------------------------- */}
+      {/* MODAL: ADD SUPER ADMIN                                        */}
+      {/* ------------------------------------------------------------- */}
+      {showAddAdminModal && (
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 sm:p-7 shadow-2xl animate-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                <ShieldCheck className="w-4 h-4 text-indigo-600" />
+                <span>Add Root Super Administrator</span>
+              </h3>
+              <button
+                onClick={() => setShowAddAdminModal(false)}
+                className="w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 hover:bg-slate-200"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="mt-3 p-3 bg-indigo-50 border border-indigo-100 rounded-xl text-xs text-indigo-900 leading-relaxed">
+              This will grant unrestricted root access across all institutes, financial reports, tenant settings, and platform configs.
+            </div>
+
+            {actionError && (
+              <div className="mt-3 p-3 bg-rose-50 border border-rose-200 text-rose-800 rounded-xl text-xs font-semibold flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
+                <span>{actionError}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleCreateSuperAdmin} className="space-y-4 mt-4">
+              <div>
+                <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">
+                  Full Name
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Alex Johnson"
+                  value={newAdminName}
+                  onChange={(e) => setNewAdminName(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-900 focus:bg-white focus:border-indigo-600 outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">
+                  Email Address
+                </label>
+                <input
+                  type="email"
+                  required
+                  placeholder="superadmin@classdesk.app"
+                  value={newAdminEmail}
+                  onChange={(e) => setNewAdminEmail(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-900 focus:bg-white focus:border-indigo-600 outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">
+                  Phone (Optional)
+                </label>
+                <input
+                  type="text"
+                  value={newAdminPhone}
+                  onChange={(e) => setNewAdminPhone(e.target.value)}
+                  placeholder="+91 9876543210"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-900 focus:bg-white focus:border-indigo-600 outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">
+                  Password
+                </label>
+                <input
+                  type="password"
+                  required
+                  placeholder="Minimum 8 characters"
+                  value={newAdminPassword}
+                  onChange={(e) => setNewAdminPassword(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-900 focus:bg-white focus:border-indigo-600 outline-none"
+                />
+              </div>
+
+              <div className="pt-2 flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShowAddAdminModal(false)}
+                  className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 py-3 rounded-2xl text-xs font-bold transition-all text-center"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmittingAdmin}
+                  className="flex-1 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white py-3 rounded-2xl text-xs font-bold shadow-md shadow-indigo-100 transition-all flex items-center justify-center gap-2"
+                >
+                  {isSubmittingAdmin ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <ShieldCheck className="w-4 h-4" />
+                  )}
+                  <span>Create Super Admin</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ------------------------------------------------------------- */}
+      {/* MODAL: CONFIRM ADMIN SENSITIVE ACTION (ACTIVATE/DEACTIVATE/DEL)*/}
+      {/* ------------------------------------------------------------- */}
+      {adminActionModal && (
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl animate-in zoom-in-95 duration-150">
+            <div className="w-12 h-12 rounded-2xl flex items-center justify-center mx-auto mb-3 bg-amber-50 text-amber-600">
+              {adminActionModal.action === 'delete' ? (
+                <Trash2 className="w-6 h-6 text-rose-600" />
+              ) : adminActionModal.action === 'deactivate' ? (
+                <AlertCircle className="w-6 h-6 text-amber-600" />
+              ) : (
+                <ShieldCheck className="w-6 h-6 text-emerald-600" />
+              )}
+            </div>
+
+            <h3 className="text-sm font-bold text-slate-900 text-center">
+              {adminActionModal.action === 'delete'
+                ? 'Delete Super Admin Account?'
+                : adminActionModal.action === 'deactivate'
+                ? 'Deactivate Super Admin?'
+                : 'Activate Super Admin?'}
+            </h3>
+
+            <p className="text-xs text-slate-500 text-center mt-2 leading-relaxed">
+              {adminActionModal.action === 'delete'
+                ? `Are you sure you want to permanently remove "${adminActionModal.admin.full_name}"? This action cannot be undone.`
+                : adminActionModal.action === 'deactivate'
+                ? `Deactivating "${adminActionModal.admin.full_name}" will temporarily revoke their Super Admin dashboard access. Their account will remain preserved.`
+                : `Activating "${adminActionModal.admin.full_name}" will immediately restore their root platform administrative access.`}
+            </p>
+
+            <div className="mt-5 flex gap-2">
+              <button
+                type="button"
+                onClick={() => setAdminActionModal(null)}
+                disabled={isProcessingAdminAction}
+                className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 py-2.5 rounded-xl text-xs font-bold transition-all text-center"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmAdminAction}
+                disabled={isProcessingAdminAction}
+                className={`flex-1 py-2.5 rounded-xl text-xs font-bold text-white transition-all flex items-center justify-center gap-1.5 shadow-sm ${
+                  adminActionModal.action === 'delete'
+                    ? 'bg-rose-600 hover:bg-rose-700'
+                    : adminActionModal.action === 'deactivate'
+                    ? 'bg-amber-600 hover:bg-amber-700'
+                    : 'bg-emerald-600 hover:bg-emerald-700'
+                }`}
+              >
+                {isProcessingAdminAction && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                <span>
+                  {adminActionModal.action === 'delete'
+                    ? 'Confirm Delete'
+                    : adminActionModal.action === 'deactivate'
+                    ? 'Confirm Deactivation'
+                    : 'Confirm Activation'}
+                </span>
+              </button>
+            </div>
           </div>
         </div>
       )}

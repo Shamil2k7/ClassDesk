@@ -36,6 +36,17 @@ export function generateFeeReceiptPdf({
   doc.text(`${institute?.address || ''}, ${institute?.city || 'India'} | Phone: ${institute?.phone || ''}`, 10, 18);
   doc.text('OFFICIAL FEE PAYMENT RECEIPT', 10, 24);
 
+  // If institute logo exists, embed in header top-right
+  if (institute?.logo_url) {
+    try {
+      doc.setFillColor(255, 255, 255);
+      doc.roundedRect(122, 4, 20, 20, 2, 2, 'F');
+      doc.addImage(institute.logo_url, 'PNG', 123, 5, 18, 18);
+    } catch {
+      // Graceful fallback if cross-origin image cannot be serialized
+    }
+  }
+
   // Receipt Meta Grid
   doc.setTextColor(30, 41, 59);
   doc.setFontSize(9);
@@ -134,6 +145,17 @@ export function generateReportCardPdf(data: ExamReportCardData) {
   doc.setFont('helvetica', 'normal');
   doc.text(`${data.institute.address || ''}, ${data.institute.city || ''}`, 15, 23);
   doc.text(`PROGRESS REPORT: ${data.exam.name.toUpperCase()}`, 15, 30);
+
+  // If institute logo exists, embed in header top-right
+  if (data.institute.logo_url) {
+    try {
+      doc.setFillColor(255, 255, 255);
+      doc.roundedRect(172, 5, 26, 26, 3, 3, 'F');
+      doc.addImage(data.institute.logo_url, 'PNG', 174, 7, 22, 22);
+    } catch {
+      // Graceful fallback
+    }
+  }
 
   // Student Info Card
   doc.setDrawColor(203, 213, 225);

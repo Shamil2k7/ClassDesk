@@ -13,6 +13,7 @@ export type FeeDueStatus = 'pending' | 'partial' | 'paid' | 'waived';
 export type PaymentMethod = 'cash' | 'upi_qr' | 'bank_transfer' | 'razorpay';
 export type PaymentStatus = 'pending' | 'successful' | 'failed' | 'refunded';
 export type TargetAudience = 'all' | 'class' | 'batch';
+export type InstituteStatus = 'active' | 'pending' | 'suspended' | 'inactive';
 export type NotificationType =
   | 'absent_alert'
   | 'fee_due'
@@ -37,14 +38,30 @@ export interface InstituteRow {
   timezone: string;
   subscription_plan: string;
   subscription_status: string;
+  status?: InstituteStatus | string;
+  institute_type?: 'school' | 'tuition_center' | 'coaching' | 'college' | string;
   settings: {
     receipt_prefix?: string;
     late_fee_enabled?: boolean;
     late_fee_per_day?: number;
     grade_system?: string;
+    institute_type?: string;
   } | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface AuditLogRow {
+  id: string;
+  institute_id: string | null;
+  user_id: string | null;
+  user_email: string | null;
+  action: string;
+  category: 'institute' | 'user' | 'security' | 'payment' | 'system' | string;
+  description: string;
+  metadata: Record<string, unknown> | null;
+  ip_address?: string | null;
+  created_at: string;
 }
 
 export interface UserRow {

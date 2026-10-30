@@ -167,6 +167,10 @@ export function TopBar() {
     : 'Perinthalmanna, Kerala | Kerala';
 
   const isStudentView = role === 'parent';
+  const currentLogo =
+    user?.role === 'super_admin'
+      ? branding.logo_url
+      : institute?.logo_url || branding.logo_url;
 
   return (
     <>
@@ -199,15 +203,25 @@ export function TopBar() {
               href={user?.role === 'super_admin' ? '/super-admin' : '/dashboard'}
               className="flex items-center gap-2.5 min-w-0 hover:opacity-95 transition-opacity"
             >
-              {/* Badge Icon */}
+              {/* Badge Icon / Institute Logo */}
               <div
-                className={`w-9 h-9 sm:w-10 sm:h-10 rounded-2xl flex items-center justify-center shrink-0 shadow-sm ${
-                  isStudentView
+                className={`w-9 h-9 sm:w-10 sm:h-10 rounded-2xl flex items-center justify-center shrink-0 shadow-sm overflow-hidden ${
+                  currentLogo
+                    ? 'bg-white border border-slate-200'
+                    : isStudentView
                     ? 'bg-[#3739bf] text-white'
                     : 'bg-white/20 backdrop-blur-md border border-white/25 text-white'
                 }`}
               >
-                <GraduationCap className="w-5 h-5 text-white" />
+                {currentLogo ? (
+                  <img
+                    src={currentLogo}
+                    alt={instituteDisplayName}
+                    className="w-full h-full object-contain p-1"
+                  />
+                ) : (
+                  <GraduationCap className="w-5 h-5 text-white" />
+                )}
               </div>
 
               <div className="min-w-0">
@@ -477,8 +491,14 @@ export function TopBar() {
             {/* Drawer Header */}
             <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
               <div className="flex items-center gap-2.5 min-w-0">
-                <div className="w-9 h-9 rounded-2xl bg-[#4338ca] flex items-center justify-center text-white font-bold text-sm shrink-0">
-                  <GraduationCap className="w-5 h-5 text-white" />
+                <div className={`w-9 h-9 rounded-2xl flex items-center justify-center font-bold text-sm shrink-0 overflow-hidden ${
+                  currentLogo ? 'bg-white border border-slate-200' : 'bg-[#4338ca] text-white'
+                }`}>
+                  {currentLogo ? (
+                    <img src={currentLogo} alt={instituteDisplayName} className="w-full h-full object-contain p-1" />
+                  ) : (
+                    <GraduationCap className="w-5 h-5 text-white" />
+                  )}
                 </div>
                 <div className="min-w-0">
                   <h3 className="text-xs font-bold text-slate-900 truncate">

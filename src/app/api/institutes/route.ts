@@ -201,6 +201,8 @@ export async function PATCH(request: Request) {
     const body = await request.json();
     const {
       id,
+      status,
+      institute_type,
       subscription_plan,
       subscription_status,
       settings,
@@ -225,6 +227,14 @@ export async function PATCH(request: Request) {
       updated_at: new Date().toISOString(),
     };
 
+    if (status !== undefined) {
+      updates.status = status;
+      // Also sync subscription_status for backward compatibility
+      if (status === 'suspended') updates.subscription_status = 'suspended';
+      else if (status === 'active') updates.subscription_status = 'active';
+      else if (status === 'inactive') updates.subscription_status = 'canceled';
+    }
+    if (institute_type !== undefined) updates.institute_type = institute_type;
     if (subscription_plan !== undefined) updates.subscription_plan = subscription_plan;
     if (subscription_status !== undefined) updates.subscription_status = subscription_status;
     if (name !== undefined) updates.name = name;
@@ -246,6 +256,23 @@ export async function PATCH(request: Request) {
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 400 });
+    }
+
+    // Record audit log if status or name changed
+    try {
+      if (status !== undefined) {
+        await adminClient.from('audit_logs').insert([
+          {
+            institute_id: id,
+            action: 'institute_status_changed',
+            category: 'institute',
+            description: `Institute status updated to "${status}"`,
+            metadata: { new_status: status },
+          },
+        ]);
+      }
+    } catch (auditErr) {
+      console.warn('[API /api/institutes] Audit log insert warning:', auditErr);
     }
 
     return NextResponse.json({ success: true, institute: data });

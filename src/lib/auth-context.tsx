@@ -4,7 +4,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { UserRole } from '@/types/database.types';
 import { Institute, Student, UserProfile } from '@/types/app.types';
 import { createClient } from '@/lib/supabase/client';
-import { getLocalData, getLocalDataForInstitute, saveLocalData, syncLocalWithRemote } from '@/lib/storage-helper';
+import { getLocalData, getLocalDataForInstitute, saveLocalData, syncLocalWithRemote, updateLocalData } from '@/lib/storage-helper';
 
 interface AuthState {
   user: UserProfile | null;
@@ -19,6 +19,7 @@ interface AuthState {
   switchChild: (studentId: string) => void;
   switchInstitute: (instituteId: string) => void;
   switchRoleDemo: (role: UserRole) => void;
+  updateInstitute: (updated: Partial<Institute>) => void;
   logout: () => Promise<void>;
 }
 
@@ -35,6 +36,7 @@ const AuthContext = createContext<AuthState>({
   switchChild: () => {},
   switchInstitute: () => {},
   switchRoleDemo: () => {},
+  updateInstitute: () => {},
   logout: async () => {},
 });
 
@@ -887,6 +889,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const updateInstitute = (updated: Partial<Institute>) => {
+    setInstitute((prev) => {
+      if (!prev) return null;
+      const merged = { ...prev, ...updated };
+      localStorage.setItem('classdesk_active_institute', JSON.stringify(merged));
+      const allInsts = getLocalData<Institute>('institutes');
+      const found = allInsts.some((i) => i.id === merged.id);
+      if (found) {
+        updateLocalData<Institute>('institutes', merged.id, merged);
+      }
+      return merged;
+    });
+  };
+
   const logout = async () => {
     try {
       await supabase.auth.signOut();
@@ -924,6 +940,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         switchChild,
         switchInstitute,
         switchRoleDemo,
+        updateInstitute,
         logout,
       }}
     >

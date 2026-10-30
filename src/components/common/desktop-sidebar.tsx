@@ -25,7 +25,7 @@ import {
 export function DesktopSidebar() {
   const pathname = usePathname();
   const router = useRouter();
-  const { user, logout } = useAuth();
+  const { user, institute, logout } = useAuth();
   const { t } = useTranslation();
 
   const handleLogout = async () => {
@@ -42,7 +42,8 @@ export function DesktopSidebar() {
     ...(role === 'super_admin'
       ? [
           { href: '/super-admin', label: 'SaaS Command Center', icon: ShieldAlert, highlight: true },
-          { href: '/institutes', label: 'Tenant Institutes', icon: Building2 },
+          { href: '/super-admin/institutes', label: 'Institutes Directory', icon: Building2 },
+          { href: '/institutes', label: 'Tenant Management', icon: Building2 },
           { href: '/settings', label: t('nav.settings', 'Settings'), icon: Settings },
         ]
       : [
@@ -90,6 +91,27 @@ export function DesktopSidebar() {
 
   return (
     <aside className="hidden sm:flex flex-col w-64 bg-white border-r border-slate-200 min-h-[calc(100vh-57px)] p-4 shrink-0">
+      {/* Institute Brand Badge */}
+      {institute && user?.role !== 'super_admin' && (
+        <div className="mb-4 p-3 bg-slate-50 border border-slate-200/80 rounded-2xl flex items-center gap-2.5">
+          <div className="w-10 h-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center p-1 shrink-0 overflow-hidden shadow-xs">
+            {institute.logo_url ? (
+              <img src={institute.logo_url} alt={institute.name} className="w-full h-full object-contain" />
+            ) : (
+              <div className="w-full h-full bg-indigo-600 text-white rounded-lg flex items-center justify-center font-bold text-xs">
+                {institute.name.charAt(0)}
+              </div>
+            )}
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-xs font-bold text-slate-900 truncate">{institute.name}</p>
+            <p className="text-[10px] text-slate-500 truncate capitalize">
+              {institute.institute_type?.replace('_', ' ') || 'Institute'}
+            </p>
+          </div>
+        </div>
+      )}
+
       <div className="space-y-1 flex-1">
         {menuItems.map((item) => {
           const isActive = pathname === item.href;

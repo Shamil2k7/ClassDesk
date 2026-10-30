@@ -1,6 +1,10 @@
-import { Database, UserRole, AttendanceStatus } from './database.types';
+import { Database, UserRole, AttendanceStatus, InstituteStatus, AuditLogRow } from './database.types';
 
-export type Institute = Database['public']['Tables']['institutes']['Row'];
+export type { InstituteStatus };
+export type Institute = Database['public']['Tables']['institutes']['Row'] & {
+  status?: InstituteStatus | string;
+  institute_type?: string;
+};
 export type UserProfile = Database['public']['Tables']['users']['Row'];
 export type ClassBatch = Database['public']['Tables']['classes']['Row'];
 export type Student = Database['public']['Tables']['students']['Row'];
@@ -17,6 +21,17 @@ export type ExamSubject = Database['public']['Tables']['exam_subjects']['Row'];
 export type MarkRecord = Database['public']['Tables']['marks']['Row'];
 export type NotificationItem = Database['public']['Tables']['notifications']['Row'];
 export type NotificationSettings = Database['public']['Tables']['notification_settings']['Row'];
+export type AuditLog = AuditLogRow;
+
+export interface SuperAdminAccount {
+  id: string;
+  full_name: string;
+  email: string;
+  phone: string;
+  is_active: boolean;
+  created_at: string;
+  last_sign_in_at?: string | null;
+}
 
 export interface AuthSession {
   user: {
